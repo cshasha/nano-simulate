@@ -130,7 +130,7 @@ h_volumes = (4/3.)*np.pi*((sizes+coating)/2.)**3   #hydrodynamic volumes (calcul
 k_values = np.random.lognormal(np.log(K), k_sigma, I)   #create array of k values
 k_values *= sign1
 k_values2 = np.random.lognormal(np.log(K2), k_sigma, I)
-k_values2 -= sign2
+k_values2 *= sign2
 betas = 2*Ms**(-1)*k_values   #create array of betas if Ms is constant
 betas2 = 2*Ms**(-1)*k_values2   #create array of betas
 
