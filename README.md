@@ -1,2 +1,2 @@
 # nano-simulate
-# nanoparticle simulation program
+nanoparticle simulation program
