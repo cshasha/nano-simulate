@@ -21,7 +21,7 @@ import os.path
 
 #---parameters---
 I = 10   #number of particles
-N = 10000   #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
+N = 100   #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
 X = 1   #number of repetitions
 
 cluster = 0   #0 = no cluster (random). 1 = chain. 2 = + (I = 5)
@@ -41,7 +41,7 @@ save = "test"   #filename.csv
 text = save + ".txt"
 save1 = save + ".csv"
 #save2 = "hyst_16nm_20mT_frozen_2D_z.csv"   #filename.csv
-interactions = "off"   #"on" or "off"
+interactions = "on"   #"on" or "off"
 brownian = "on"   #on or off
 aligned = "no"   #yes or no. if yes, sets all axes and moments to z direction
 
@@ -480,8 +480,6 @@ def runMC(temp, bias):
 			norm_n = np.sqrt(np.einsum('...i,...i', nb, nb))
 			nb /= norm_n[:,None]
 			
-			if interactions == "on":
-				hbar += H_dip
 			if shape == "u":
 				tbar = 2*(k_values*volumes)[:,None]*np.absolute(np.sum(mb*nb,axis=1))[:,None]*np.cross(nb,mb)
 				hbar = 2*betas[:,None]*np.sum(mb*nb,axis=1)[:,None]*nb
@@ -501,7 +499,8 @@ def runMC(temp, bias):
 			
 				#hbar = 2*betas[:,None]*np.sum(mb*nb,axis=1)[:,None]*nb
 				#tbar = 2*(k_values*volumes)[:,None]*np.absolute(np.sum(mb*nb,axis=1))[:,None]*np.cross(nb,mb)
-
+			if interactions == "on":
+				hbar += H_dip
 			hbar[:,1] += H_app_y[n+1]	
 			hbar[:,2] += H_app_z[n+1] + H_bias[n+1]  #added bias here
 			#print(hbar)	
@@ -675,7 +674,7 @@ hystX = np.zeros((N,2,X))
 
 for xx in range(X):
 	initialize()
-	thermalize(temperature)
+	#thermalize(temperature)
 	runMC(temperature,0)
 	hystX[:,0,xx] = H_app_z[0:N]*1000
 	hystX[:,1,xx] = np.mean(M[:,2,:],axis=0)
@@ -1066,9 +1065,9 @@ np.savetxt("dMdH_K12000_hyst.csv", dMdH[:,2,:], delimiter=",")
 hyst = np.mean(hystX, axis=2)
 np.savetxt(save1, hyst, delimiter=",")
 
-#pl.plot(hyst[:,0],hyst[:,1])
+pl.plot(hyst[:,0],hyst[:,1])
 #pl.plot(hyst[:,1])
-#pl.ylabel('Magnetic Moment')
-#pl.xlabel('Mag Field')
-#pl.show()
+pl.ylabel('Magnetic Moment')
+pl.xlabel('Mag Field')
+pl.show()
 
