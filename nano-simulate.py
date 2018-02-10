@@ -350,8 +350,6 @@ def thermalize(temp):
 			nb = Axes[:,:,n] + (6*eta*h_volumes[:,None])**(-1)*(np.cross(Torque,Axes[:,:,n])*dt + np.cross(dT,Axes[:,:,n]))
 			norm_n = np.sqrt(np.einsum('...i,...i', nb, nb))
 			nb /= norm_n[:,None]
-			if interactions == "on":
-				hbar += H_dip
 			if shape == "u":
 				tbar = 2*(k_values*volumes)[:,None]*np.absolute(np.sum(mb*nb,axis=1))[:,None]*np.cross(nb,mb)
 				hbar = 2*betas[:,None]*np.sum(mb*nb,axis=1)[:,None]*nb
@@ -365,7 +363,8 @@ def thermalize(temp):
 					   -2*(k_values*volumes)[:,None]*(myb**2 + mzb**2)*mxb*np.cross(nxb,mb) - 2*(k_values2*volumes)[:,None]*myb**2*mzb**2*mxb*np.cross(nxb,mb) \
 					   -2*(k_values*volumes)[:,None]*(mzb**2 + mxb**2)*myb*np.cross(nyb,mb) - 2*(k_values2*volumes)[:,None]*mzb**2*mxb**2*myb*np.cross(nyb,mb)
 				hbar = -betas[:,None]*(mxb**2*mzb*nb + myb**2*mzb*nb + mxb**2*myb*nyb + mzb**2*myb*nyb + myb**2*mxb*nxb + mzb**2*mxb*nxb) - 2*betas2[:,None]*(mxb**2*myb**2*mzb*nb + mxb**2*mzb**2*myb*nyb + myb**2*mzb**2*mxb*nxb)
-
+			if interactions == "on":
+				hbar += H_dip
 			Axes[:,:,n+1] = Axes[:,:,n] + (6*eta*h_volumes[:,None])**(-1)*0.5*(dt*(np.cross(Torque,Axes[:,:,n]) + np.cross(tbar,nb)) + np.cross(dT,Axes[:,:,n]) + np.cross(dT,nb))
 			norm2 = np.sqrt(np.einsum('...i,...i', Axes[:,:,n+1], Axes[:,:,n+1]))
 			Axes[:,:,n+1] /= norm2[:,None]
@@ -674,7 +673,7 @@ hystX = np.zeros((N,2,X))
 
 for xx in range(X):
 	initialize()
-	#thermalize(temperature)
+	thermalize(temperature)
 	runMC(temperature,0)
 	hystX[:,0,xx] = H_app_z[0:N]*1000
 	hystX[:,1,xx] = np.mean(M[:,2,:],axis=0)
