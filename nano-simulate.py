@@ -8,6 +8,7 @@ from scipy.optimize import curve_fit
 import warnings
 warnings.filterwarnings("ignore")
 import os.path
+from decimal import Decimal
 
 
 #---about output:
@@ -20,8 +21,8 @@ import os.path
 
 
 #---parameters---
-I = 10   #number of particles
-N = 100   #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
+I = 100   #number of particles
+N = 10000   #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
 X = 1   #number of repetitions
 
 cluster = 0   #0 = no cluster (random). 1 = chain. 2 = + (I = 5)
@@ -41,7 +42,7 @@ save = "test"   #filename.csv
 text = save + ".txt"
 save1 = save + ".csv"
 #save2 = "hyst_16nm_20mT_frozen_2D_z.csv"   #filename.csv
-interactions = "on"   #"on" or "off"
+interactions = "off"   #"on" or "off"
 brownian = "on"   #on or off
 aligned = "no"   #yes or no. if yes, sets all axes and moments to z direction
 
@@ -99,7 +100,7 @@ rAvg = 3**(1/2.)*C**(-1/3.)  #estimated avg interparticle distance
 
 w = 2*np.pi*f   #angular frequency (Rad/sec). constraint: f*N must be integer
 dt = cycs*(f*N)**(-1)   #time step
-#dt = 1e-9
+#dt = 1e-12
 T = np.arange(0,dt*N,dt)   #array of time steps
 
 
@@ -419,7 +420,7 @@ def thermalize(temp):
 
 def runMC(temp, bias):
 	#Ms = M0*(1 - b*temp**a)
-	global nx, ny
+	global nx, ny, U1
 	betas = Ms**(-1)*k_values
 	betas2 = Ms**(-1)*k_values2
 	d = (1+lam**2)*kb*(gamma*Ms*lam)**(-1) 
@@ -433,7 +434,6 @@ def runMC(temp, bias):
 		if brownian == "on":
 			dT = np.random.normal(loc = 0.0, scale = 1, size = (I,3))
 			dT *= np.sqrt(dt*12*kb*temp*eta*h_volumes[:,None])
-			dT *= 0
 				
 		if shape == "u":
 			if brownian == "on":
@@ -444,6 +444,9 @@ def runMC(temp, bias):
 			mx = np.sum(M[:,:,n]*nx,axis=1)[:,None]
 			my = np.sum(M[:,:,n]*ny,axis=1)[:,None]
 			mz = np.sum(M[:,:,n]*Axes[:,:,n],axis=1)[:,None]
+			#print(nx)
+			#print(my)
+			#print(mz)
 			if brownian == "on":
 				Torque = -2*(k_values*volumes)[:,None]*(my**2 + mx**2)*mz*np.cross(Axes[:,:,n],M[:,:,n]) - 2*(k_values2*volumes)[:,None]*my**2*mx**2*mz*np.cross(Axes[:,:,n],M[:,:,n]) \
 					     -2*(k_values*volumes)[:,None]*(my**2 + mz**2)*mx*np.cross(nx,M[:,:,n]) - 2*(k_values2*volumes)[:,None]*my**2*mz**2*mx*np.cross(nx,M[:,:,n]) \
@@ -470,13 +473,16 @@ def runMC(temp, bias):
 			H_dip = np.sum(Q.filled(0)[0:I,:,:],axis=1)
 			H += H_dip
 		
+		#print(M[:,:,n])
 		mb = M[:,:,n] + gamma*(1+lam**2)**(-1)*((np.cross(M[:,:,n],H) - lam*np.cross(M[:,:,n], np.cross(M[:,:,n],H)))*dt + np.cross(M[:,:,n],dW) - lam*np.cross(M[:,:,n], np.cross(M[:,:,n],dW)))
 		norm_m = np.sqrt(np.einsum('...i,...i', mb, mb))
 		mb /= norm_m[:,None]
-
+		#print(H)
+		#print(mb)
 		if brownian == "on":
 			nb = Axes[:,:,n] + (6*eta*h_volumes[:,None])**(-1)*(np.cross(Torque,Axes[:,:,n])*dt + np.cross(dT,Axes[:,:,n]))
 			norm_n = np.sqrt(np.einsum('...i,...i', nb, nb))
+			#print(norm_n)
 			nb /= norm_n[:,None]
 			
 			if shape == "u":
@@ -531,9 +537,24 @@ def runMC(temp, bias):
 
 		if shape == "c" and brownian == "on":
 			U = np.cross(Axes[:,:,n],Axes[:,:,n+1],axis=1)
+			if np.any(np.isnan(U)) == 1:
+				print('trueU')
+				U = U1
+
 			U /= np.sqrt(U[:,0]**2 + U[:,1]**2 + U[:,2]**2)[:,None]
+			U1 = U
+			#j = np.sum(Axes[:,:,n]*Axes[:,:,n+1],axis=1)
+			#al = np.arccos(j)
 			al = np.arccos(np.sum(Axes[:,:,n]*Axes[:,:,n+1],axis=1))
-			#print(al)
+			if np.any(np.isnan(al)) == 1:
+				print('trueA')
+				al.fill(0)
+
+			#print(j)
+			#print('%e' % Axes[0,0,n])
+			#print('%e' % Axes[0,1,n])
+			#print('%e' % Axes[0,2,n])
+			#print(U)
 			Rot = np.array([[np.cos(al) + (U[:,0]**2)*(1 - np.cos(al)), U[:,0]*U[:,1]*(1 - np.cos(al)) - U[:,2]*np.sin(al), U[:,0]*U[:,2]*(1 - np.cos(al)) + U[:,1]*np.sin(al)],[U[:,0]*U[:,1]*(1 - np.cos(al)) + U[:,2]*np.sin(al), np.cos(al) + (U[:,1]**2)*(1 - np.cos(al)), U[:,2]*U[:,1]*(1 - np.cos(al)) - U[:,0]*np.sin(al)],[U[:,0]*U[:,2]*(1 - np.cos(al)) - U[:,1]*np.sin(al),U[:,2]*U[:,1]*(1 - np.cos(al)) + U[:,0]*np.sin(al), np.cos(al) + (U[:,2]**2)*(1 - np.cos(al))]])
 			nx2 = np.zeros((I,3))
 			ny2 = np.zeros((I,3))
@@ -543,7 +564,8 @@ def runMC(temp, bias):
 
 			nx = nx2
 			ny = ny2
-
+			#print(Rot[:,:,:])
+			"""
 			al2 = np.sqrt(dW[:,0]**2 + dW[:,1]**2 + dW[:,2]**2)
 			nx3 = np.zeros((I,3))
 			ny3 = np.zeros((I,3))
@@ -554,20 +576,26 @@ def runMC(temp, bias):
 			
 			nx = nx3
 			ny = ny3
+			"""
 
 		vstep = (N)**(-1)
 		vect = np.arange(vstep,1+vstep,vstep)
 		#vect *=20
-		#if n > 9000:
-		#pl.plot(Axes[:,0,n], Axes[:,2,n], linestyle = 'none', marker = '.',color = 'blue', alpha = vect[n])
-		#pl.plot(M[:,0,n], M[:,2,n], linestyle = 'none', marker = '.',color = 'm', alpha = vect[n])
-		#pl.plot(nx[:,0], nx[:,2], linestyle = 'none', marker = '.',color = 'red', alpha = vect[n])
-		#pl.plot(ny[:,0], ny[:,2], linestyle = 'none', marker = '.',color = 'c', alpha = vect[n])
+		#if n % 10 == 0:
+		#	pl.plot(Axes[:,0,n], Axes[:,2,n], linestyle = 'none', marker = '.',color = 'blue', alpha = vect[n])
+		#	#pl.plot(M[:,0,n], M[:,2,n], linestyle = 'none', marker = '.',color = 'm', alpha = vect[n])
+		#	pl.plot(nx[:,0], nx[:,2], linestyle = 'none', marker = '.',color = 'red', alpha = vect[n])
+		#	pl.plot(ny[:,0], ny[:,2], linestyle = 'none', marker = '.',color = 'c', alpha = vect[n])
+		#if n % 1000 == 0:
+		#	print(M[:,:,n+1])
+		#	print(n)
+		#print(H)
+		#print(Torque)
 
 
 	#pl.ylim([-0.1,1.1])
 	#pl.xlim([-0.1,1.1])
-	#pl.show()
+	pl.show()
 	return M
 
 def runAC():	
@@ -673,7 +701,7 @@ hystX = np.zeros((N,2,X))
 
 for xx in range(X):
 	initialize()
-	thermalize(temperature)
+	#thermalize(temperature)
 	runMC(temperature,0)
 	hystX[:,0,xx] = H_app_z[0:N]*1000
 	hystX[:,1,xx] = np.mean(M[:,2,:],axis=0)
