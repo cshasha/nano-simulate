@@ -9,6 +9,8 @@ import warnings
 warnings.filterwarnings("ignore")
 import os.path
 from decimal import Decimal
+import sys
+from functools import reduce
 
 
 #---about output:
@@ -21,7 +23,7 @@ from decimal import Decimal
 
 
 #---parameters---
-I = 100   #number of particles
+I = 20   #number of particles
 N = 10000   #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
 X = 1   #number of repetitions
 
@@ -70,7 +72,7 @@ shape = "c"   #either "u" for uniaxial or "c" for cubic
 
 tauPercent = 0.1
 
-K = -20000.   #anisotropy constant (J/m^3). 1 J/m^3 = 10 erg/cm^3
+K = -15000.   #anisotropy constant (J/m^3). 1 J/m^3 = 10 erg/cm^3
 K2 = -5000.
 #sd = 3000.   #standard deviation of K
 sd = 1.
@@ -225,7 +227,8 @@ def initialize():
 	H_dip = np.zeros((I,3))
 	H_app_z = h0*np.cos(w*T)
 	if twoD == "on":
-		H_app_y = h0*np.sin(w*T)
+		w2 = 1.05*w
+		H_app_y = h0*np.sin(w2*T)
 	else:
 		H_app_y = 0*np.sin(w*T)
 	
@@ -289,14 +292,23 @@ def initialize():
 def makeGhost(mcGhost, n):
 	mGhost = M[:,:,n]
 
-	mGhost = np.vstack((mGhost,mGhost[g_mask_x1]))
-	mGhost = np.vstack((mGhost,mGhost[g_mask_x2]))
+	mX1 = np.copy(mGhost[g_mask_x1])
+	mX2 = np.copy(mGhost[g_mask_x2])
 
-	mGhost = np.vstack((mGhost,mGhost[g_mask_y1]))
-	mGhost = np.vstack((mGhost,mGhost[g_mask_y2]))
+	mGhost = np.vstack((mGhost,mX1))
+	mGhost = np.vstack((mGhost,mX2))
 
-	mGhost = np.vstack((mGhost,mGhost[g_mask_z1]))
-	mGhost = np.vstack((mGhost,mGhost[g_mask_z2]))
+	mY1 = np.copy(mGhost[g_mask_y1])
+	mY2 = np.copy(mGhost[g_mask_y2])
+
+	mGhost = np.vstack((mGhost,mY1))
+	mGhost = np.vstack((mGhost,mY2))
+
+	mZ1 = np.copy(mGhost[g_mask_z1])
+	mZ2 = np.copy(mGhost[g_mask_z2])
+
+	mGhost = np.vstack((mGhost,mZ1))
+	mGhost = np.vstack((mGhost,mZ2))
 
 	return mGhost
 
@@ -579,13 +591,15 @@ def runMC(temp, bias):
 			"""
 
 		vstep = (N)**(-1)
-		vect = np.arange(vstep,1+vstep,vstep)
+		#vect = np.arange(vstep,1+vstep,vstep)
+		vect = np.logspace(vstep,1,num=N)
+		vect /= 10
 		#vect *=20
-		#if n % 10 == 0:
-		#	pl.plot(Axes[:,0,n], Axes[:,2,n], linestyle = 'none', marker = '.',color = 'blue', alpha = vect[n])
-		#	#pl.plot(M[:,0,n], M[:,2,n], linestyle = 'none', marker = '.',color = 'm', alpha = vect[n])
-		#	pl.plot(nx[:,0], nx[:,2], linestyle = 'none', marker = '.',color = 'red', alpha = vect[n])
-		#	pl.plot(ny[:,0], ny[:,2], linestyle = 'none', marker = '.',color = 'c', alpha = vect[n])
+		if n % 10 == 0:
+			pl.plot(Axes[:,1,n], Axes[:,2,n], linestyle = 'none', marker = '.',color = 'blue', alpha = vect[n])
+			pl.plot(M[:,1,n], M[:,2,n], linestyle = 'none', marker = '.',color = 'm', alpha = vect[n])
+		#pl.plot(nx[:,0], nx[:,2], linestyle = 'none', marker = '.',color = 'red', alpha = vect[n])
+		#pl.plot(ny[:,0], ny[:,2], linestyle = 'none', marker = '.',color = 'c', alpha = vect[n])
 		#if n % 1000 == 0:
 		#	print(M[:,:,n+1])
 		#	print(n)
@@ -1092,9 +1106,9 @@ np.savetxt("dMdH_K12000_hyst.csv", dMdH[:,2,:], delimiter=",")
 hyst = np.mean(hystX, axis=2)
 np.savetxt(save1, hyst, delimiter=",")
 
-pl.plot(hyst[:,0],hyst[:,1])
+#pl.plot(hyst[:,0],hyst[:,1])
 #pl.plot(hyst[:,1])
-pl.ylabel('Magnetic Moment')
-pl.xlabel('Mag Field')
-pl.show()
+#pl.ylabel('Magnetic Moment')
+#pl.xlabel('Mag Field')
+#pl.show()
 
