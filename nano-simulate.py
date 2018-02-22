@@ -11,6 +11,7 @@ import os.path
 from decimal import Decimal
 import sys
 from functools import reduce
+#from mpl_toolkits.mplot3d import axes3d
 
 
 #---about output:
@@ -23,7 +24,7 @@ from functools import reduce
 
 
 #---parameters---
-I = 20   #number of particles
+I = 8   #number of particles
 N = 10000   #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
 X = 1   #number of repetitions
 
@@ -155,9 +156,21 @@ def initialize():
 		M_coords = np.random.rand(I,3)*L   #positions of particles. need to add limits
 	if cluster == 1:
 		M_coords = np.zeros((I,3))
+		c_theta = np.random.rand(1)*np.pi/2.
+		c_phi = np.random.rand(1)*np.pi/2.
+		#fig = pl.figure()
+		#ax = fig.add_subplot(111, projection='3d')
+
 		for c in range(I):
-			M_coords[c,2] = c*diam1
+			#M_coords[c,2] = c*diam1
 			#M_coords[c,0] = c*diam1
+			M_coords[c,0] = c*diam1*np.sin(c_theta)*np.cos(c_phi)
+			M_coords[c,1] = c*diam1*np.sin(c_theta)*np.sin(c_phi)
+			M_coords[c,2] = c*diam1*np.cos(c_theta)
+			#ax.scatter(M_coords[c,0], M_coords[c,1], M_coords[c,2], c='m')
+
+		#pl.show()
+
 	if cluster == 2:
 		M_coords = np.zeros((I,3))
 		M_coords[0,0] = diam1
@@ -711,16 +724,6 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
 	return np.convolve( m[::-1], y, mode='valid')
 
 
-hystX = np.zeros((N,2,X))
-
-for xx in range(X):
-	initialize()
-	#thermalize(temperature)
-	runMC(temperature,0)
-	hystX[:,0,xx] = H_app_z[0:N]*1000
-	hystX[:,1,xx] = np.mean(M[:,2,:],axis=0)
-	print(xx)
-
 
 """
 #X'' vs. Temp
@@ -1102,6 +1105,15 @@ np.savetxt("dMdH_K12000_psf.csv", dMdH[:,1,:], delimiter=",")
 np.savetxt("dMdH_K12000_hyst.csv", dMdH[:,2,:], delimiter=",")
 
 """
+hystX = np.zeros((N,2,X))
+
+for xx in range(X):
+	initialize()
+	thermalize(temperature)
+	runMC(temperature,0)
+	hystX[:,0,xx] = H_app_z[0:N]*1000
+	hystX[:,1,xx] = np.mean(M[:,2,:],axis=0)
+	#print(xx)
 
 hyst = np.mean(hystX, axis=2)
 np.savetxt(save1, hyst, delimiter=",")
