@@ -22,10 +22,11 @@ from functools import reduce
 # to turn off, comment out "pl.show()", the last line of the program. the iteration number
 # is printed (up to X)
 
+w = float(sys.argv[1])
 
 #---parameters---
-I = 8   #number of particles
-N = 10000   #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
+I = 10   #number of particles
+N = 1000   #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
 X = 1   #number of repetitions
 
 cluster = 0   #0 = no cluster (random). 1 = chain. 2 = + (I = 5)
@@ -41,7 +42,7 @@ Fsteps = 40
 freqs = np.logspace(minF,maxF,num=Fsteps)
 """
 
-save = "test"   #filename.csv
+save = "test"  #filename to save
 text = save + ".txt"
 save1 = save + ".csv"
 #save2 = "hyst_16nm_20mT_frozen_2D_z.csv"   #filename.csv
@@ -53,40 +54,44 @@ aligned = "no"   #yes or no. if yes, sets all axes and moments to z direction
 kb = 1.381e-23   #boltzmann constant
 mu0 = 1e-7   #mu0/4pi 
 
-C = 1e15   #concentration
+#C = 1e15   #concentration
 
 h0 = .02  #applied field amp (T/mu0). 10 Oe = 0.001 T
-f = 26000   #frequency (Hz)
-cycs = 1   #number of field cycles
+f = 25500   #frequency (Hz)
+cycs = 2   #number of field cycles
 twoD = "off"   #on or off
 N *= cycs
 
 num_sizes = 1   #number of different sizes (1 or 2)
-diam1 = 25e-9   #average particle diameter 1
+diam1 = 21.9e-9   #average particle diameter 1
 diam2 = 25e-9   #second average diameter
-sigma = .01   #polydispersity index. typical good: 0.05
+sigma = .09   #polydispersity index. typical good: 0.05
 #s = 3.2e-9
 #sigma = np.sqrt(np.log(1 + s**2*diam1**(-2)))
-coating = 40e-9   #added diameter due to coating
+coating = 35e-9   #added diameter due to coating
 
 shape = "c"   #either "u" for uniaxial or "c" for cubic
 
 tauPercent = 0.1
 
-K = -15000.   #anisotropy constant (J/m^3). 1 J/m^3 = 10 erg/cm^3
+C = np.sqrt(3)**3*(2*(diam1+coating))**(-3)
+
+KB = -13000
+KS = -5.1e-5
+K = KB + 6*KS/diam1   #anisotropy constant (J/m^3). 1 J/m^3 = 10 erg/cm^3
 K2 = -5000.
-#sd = 3000.   #standard deviation of K
-sd = 1.
-k_sigma = np.sqrt(np.log(1 + sd**2*abs(K)**(-2)))   #variance for k values
+k_sigma = 0.2 #variance for k values
 rho = 4.9e6   #np density (g/m^3)
-gamma = 1.3e9   #gyromag ratio (Hz/T) 1.3e9
-#gamma = 1.76e11
+#gamma = 1.3e9   #gyromag ratio (Hz/T) 1.3e9
+gyro = 1.76e11
 lam = 1   #damping
 Ms = 420000.   #saturation magnetization in A/m (420000 for Magnetite) scaled - bulk values 476k magnetite, 426k maghemite. 367.5?
 M0 = 491511.   #magnetization at 0K, for Bloch's law
 a = 1.5   #values for Bloch's law
 b = 2.8e-5   #values for Bloch's law
 eta = 8.9e-4   #viscosity. water: 8.9e-4 in Pa*s = kg/m/s. viscosity of air = 1.81e-5
+H_k = 2*np.abs(K)/(Ms)
+gamma = gyro*H_k/(2*np.pi)
 
 temperature = 300.
 
@@ -160,7 +165,6 @@ def initialize():
 		c_phi = np.random.rand(1)*np.pi/2.
 		#fig = pl.figure()
 		#ax = fig.add_subplot(111, projection='3d')
-
 		for c in range(I):
 			#M_coords[c,2] = c*diam1
 			#M_coords[c,0] = c*diam1
@@ -332,7 +336,7 @@ def thermalize(temp):
 	betas = Ms**(-1)*k_values
 	betas2 = Ms**(-1)*k_values2
 	d = (1+lam**2)*kb*(gamma*Ms*lam)**(-1) 
-	for n in range(N-1):
+	for n in range(int(N/3)):
 		dW = np.random.normal(loc = 0.0, scale = 1, size = (I,3))
 		dW *= np.sqrt(dt*2*d*temp*volumes[:,None]**(-1))
 
@@ -572,7 +576,7 @@ def runMC(temp, bias):
 			#al = np.arccos(j)
 			al = np.arccos(np.sum(Axes[:,:,n]*Axes[:,:,n+1],axis=1))
 			if np.any(np.isnan(al)) == 1:
-				print('trueA')
+				#print('trueA')
 				al.fill(0)
 
 			#print(j)
@@ -605,12 +609,12 @@ def runMC(temp, bias):
 
 		vstep = (N)**(-1)
 		#vect = np.arange(vstep,1+vstep,vstep)
-		vect = np.logspace(vstep,1,num=N)
-		vect /= 10
+		#vect = np.logspace(vstep,1,num=N)
+		#vect /= 10
 		#vect *=20
-		if n % 10 == 0:
-			pl.plot(Axes[:,1,n], Axes[:,2,n], linestyle = 'none', marker = '.',color = 'blue', alpha = vect[n])
-			pl.plot(M[:,1,n], M[:,2,n], linestyle = 'none', marker = '.',color = 'm', alpha = vect[n])
+		#if n % 10 == 0:
+		#	pl.plot(Axes[:,1,n], Axes[:,2,n], linestyle = 'none', marker = '.',color = 'blue', alpha = vect[n])
+		#	pl.plot(M[:,1,n], M[:,2,n], linestyle = 'none', marker = '.',color = 'm', alpha = vect[n])
 		#pl.plot(nx[:,0], nx[:,2], linestyle = 'none', marker = '.',color = 'red', alpha = vect[n])
 		#pl.plot(ny[:,0], ny[:,2], linestyle = 'none', marker = '.',color = 'c', alpha = vect[n])
 		#if n % 1000 == 0:
@@ -622,7 +626,7 @@ def runMC(temp, bias):
 
 	#pl.ylim([-0.1,1.1])
 	#pl.xlim([-0.1,1.1])
-	pl.show()
+	#pl.show()
 	return M
 
 def runAC():	
