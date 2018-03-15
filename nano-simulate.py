@@ -1,17 +1,16 @@
-import numpy as np
-import pylab as pl
-import itertools
-from numpy.matlib import repmat, repeat
-import numpy.ma as ma
-from math import factorial
-from scipy.optimize import curve_fit
-import warnings
-warnings.filterwarnings("ignore")
-import os.path
-from decimal import Decimal
-import sys
-from functools import reduce
 #from mpl_toolkits.mplot3d import axes3d
+from datetime import datetime, timedelta
+from decimal import Decimal
+from functools import reduce
+from math import factorial
+from numpy.matlib import repmat, repeat
+from scipy.optimize import curve_fit
+import itertools
+import numpy as np
+import numpy.ma as ma
+import os.path, sys, time, warnings
+import pylab as pl
+warnings.filterwarnings("ignore")
 
 
 #---about output:
@@ -22,11 +21,12 @@ from functools import reduce
 # to turn off, comment out "pl.show()", the last line of the program. the iteration number
 # is printed (up to X)
 
-w = float(sys.argv[1])
+# w = float(sys.argv[1])
+w = 1
 
 #---parameters---
-I = 10   #number of particles
-N = 1000   #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
+I = 100   #number of particles
+N = 10000  #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
 X = 1   #number of repetitions
 
 cluster = 0   #0 = no cluster (random). 1 = chain. 2 = + (I = 5)
@@ -45,7 +45,7 @@ freqs = np.logspace(minF,maxF,num=Fsteps)
 save = "test"  #filename to save
 text = save + ".txt"
 save1 = save + ".csv"
-#save2 = "hyst_16nm_20mT_frozen_2D_z.csv"   #filename.csv
+
 interactions = "off"   #"on" or "off"
 brownian = "on"   #on or off
 aligned = "no"   #yes or no. if yes, sets all axes and moments to z direction
@@ -63,29 +63,31 @@ twoD = "off"   #on or off
 N *= cycs
 
 num_sizes = 1   #number of different sizes (1 or 2)
-diam1 = 21.9e-9   #average particle diameter 1
-diam2 = 25e-9   #second average diameter
-sigma = .09   #polydispersity index. typical good: 0.05
+
+diam1 = 27.7e-9   #average particle diameter 1
+diam2 = diam1   #second average diameter
+sigma = .07   #polydispersity index. typical good: 0.05
 #s = 3.2e-9
 #sigma = np.sqrt(np.log(1 + s**2*diam1**(-2)))
-coating = 35e-9   #added diameter due to coating
+hydro = 50e-9
+coating = hydro - diam1   #added diameter due to coating
 
 shape = "c"   #either "u" for uniaxial or "c" for cubic
-
+ 
 tauPercent = 0.1
-
-C = np.sqrt(3)**3*(2*(diam1+coating))**(-3)
 
 KB = -13000
 KS = -5.1e-5
 K = KB + 6*KS/diam1   #anisotropy constant (J/m^3). 1 J/m^3 = 10 erg/cm^3
 K2 = -5000.
-k_sigma = 0.2 #variance for k values
+
+k_sigma = 2*sigma #variance for k values
+
 rho = 4.9e6   #np density (g/m^3)
 #gamma = 1.3e9   #gyromag ratio (Hz/T) 1.3e9
 gyro = 1.76e11
 lam = 1   #damping
-Ms = 420000.   #saturation magnetization in A/m (420000 for Magnetite) scaled - bulk values 476k magnetite, 426k maghemite. 367.5?
+Ms = 360000.   #saturation magnetization in A/m (420000 for Magnetite) scaled - bulk values 476k magnetite, 426k maghemite. 367.5?
 M0 = 491511.   #magnetization at 0K, for Bloch's law
 a = 1.5   #values for Bloch's law
 b = 2.8e-5   #values for Bloch's law
@@ -119,8 +121,8 @@ nx = np.zeros((I,3))
 ny = np.zeros((I,3))
 Axes = np.zeros((I,3,N))   #initialize anisotropy axes
 
-XX1 = np.zeros((X,int((maxT-minT)/tstep)+1,2))   #initialize matrices of susceptibilities
-XX2 = np.zeros((X,int((maxT-minT)/tstep)+1,2))
+#XX1 = np.zeros((X,int((maxT-minT)/tstep)+1,2))   #initialize matrices of susceptibilities
+#XX2 = np.zeros((X,int((maxT-minT)/tstep)+1,2))
 #XF1 = np.zeros((X,Fsteps,2))   #initialize matrices of susceptibilities
 #XF2 = np.zeros((X,Fsteps,2))
 
@@ -141,6 +143,18 @@ k_values2 *= np.sign(K2)
 betas = Ms**(-1)*k_values   #create array of betas if Ms is constant
 betas2 = Ms**(-1)*k_values2   #create array of betas
 
+def timeit(method):
+	def timed(*args, **kw):
+		ts = time.time()
+		result = method(*args, **kw)
+		te = time.time()
+		microsec = timedelta(microseconds=(te-ts)*1000*1000)
+		d = datetime(1,1,1) + microsec
+		print(method.__name__ +  " %d:%d:%d:%d.%d" % (d.day-1, d.hour, d.minute, d.second, d.microsecond/1000))
+		return result
+	return timed
+
+@timeit
 def initialize():
 	global M 
 	global mcGhost
@@ -330,6 +344,7 @@ def makeGhost(mcGhost, n):
 	return mGhost
 
 #---thermalizes for N/5 steps
+@timeit
 def thermalize(temp):
 	#Ms = M0*(1 - b*temp**a)
 	global nx, ny
@@ -446,7 +461,7 @@ def thermalize(temp):
 	Axes[:,:,0] = np.copy(Axes[:,:,int(N/5)])
 	return M
 
-
+@timeit
 def runMC(temp, bias):
 	#Ms = M0*(1 - b*temp**a)
 	global nx, ny, U1
@@ -729,386 +744,7 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
 
 
 
-"""
-#X'' vs. Temp
 
-xx1, xx2 = main()
-
-np.savetxt(save, xx2, delimiter=",")
-
-pl.plot(xx2[:,0], xx2[:,1], '.', color='darkblue')
-pl.plot(xx2[:,0], xx2[:,1], color='darkblue', linewidth = 0.5)
-pl.ylabel('X"')
-pl.xlabel('Temperature (K)')
-pl.title('X" vs. Temperature')
-pl.show()
-
-pl.plot(xx1[:,0], xx1[:,1], linewidth = 0.5)
-pl.ylabel('X')
-pl.xlabel('Temperature (K)')
-pl.title('X vs. Temperature')
-#pl.show()
-
-
-#np.savetxt("5nm_sigma3_X1.csv", xx1, delimiter=",")
-#np.savetxt("X2_6p3nm_K7000_f10000_t1.csv", xx2, delimiter=",")
-"""
-
-
-"""
-#MPS harmonics at different temps
-
-Harm = np.zeros((20,2,5))
-
-for xx in range(5):
-	initialize()
-	for x in range(20):
-		tem = 270+x*5
-		print x
-		runMC(tem)
-		fM = np.fft.fft(np.mean(M[:,2,:],axis=0))
-		Har = abs(fM[1:9])
-		Harm[x,0,xx] = tem
-		Harm[x,1,xx] = Har[4]/Har[2]
-"""
-"""
-#MPS harmonics at different amplitudes
-
-nAmps = 7
-Harm = np.zeros((nAmps,9,X))
-
-for xx in range(X):
-	h0 = 0.015
-	initialize()
-	for x in range(nAmps):
-		print h0
-		runMC(300,0)
-		fM = np.fft.fft(np.mean(M[:,2,:],axis=0))
-		Har = abs(fM[1:9])
-		Harm[x,0,xx] = h0
-		#Harm[x,1,xx] = Har[4]/Har[2]
-		Harm[x,1:,xx] = Har[:]
-		h0 += 0.002
-
-Harms = np.mean(Harm, axis=2)
-
-np.savetxt("Harmonics_17nm_varamp_test3.csv", Harms, delimiter=",")
-"""
-"""
-#MPS harmonics at different viscosities
-
-Harm = np.zeros((20,9,X))
-
-for xx in range(X):
-	initialize()
-	for x in range(20):
-		print eta
-		runMC(300,0)
-		fM = np.fft.fft(np.mean(M[:,2,:],axis=0))
-		Har = abs(fM[1:9])
-		Harm[x,0,xx] = eta
-		#Harm[x,1,xx] = Har[4]/Har[2]
-		Harm[x,1:,xx] = Har[:]
-		eta *= 1.5 
-
-Harms = np.mean(Harm, axis=2)
-
-np.savetxt("Harmonics_1234_varamp.csv", Harms, delimiter=",")
-"""
-"""
-
-#MPS harmonics at different bias fields
-
-fields = 12
-Harm = np.zeros((X,21,fields))
-amp = np.zeros(fields)
-bmin = 0
-bmax = 0.15
-#h0 = 0.01
-bias = np.linspace(bmin,bmax,fields)
-for q in range(fields):
-	amp[q] = bias[q]
-	#print(bias[q])
-	for xx in range(X):
-		initialize()
-		thermalize(300)
-		runMC(300,bias[q])
-		#yhat = savitzky_golay(np.mean(M[:,2,:],axis=0), 51, 3)
-		#yhat = savitzky_golay(yhat2, 51, 3)
-		#fM = np.fft.fft(yhat)
-		fM = np.fft.fft(np.mean(M[:,2,:],axis=0))
-
-		##fM = np.fft.fft(M[:,2,:])
-		##fM = np.sum(fM,axis=0)
-		Harm[xx,0,q] = amp[q]
-		Harm[xx,1:,q] = abs(fM[1:21])
-		##Harm[xx,1:21,q] = np.real(fM[1:21])
-		##Harm[xx,21:41,q] = np.imag(fM[1:21])
-		##Harm[xx,1:,q] = abs(fM[1:21])**2
-		if q == 0:
-			phase = np.angle(fM[1:21])
-			print phase.shape
-
-	print(q)
-	#h0 += 0.002
-
-#ratio = Harm[:,4]/Harm[:,2]
-Har = np.mean(Harm, axis=0)
-np.savetxt(save, Har, delimiter=",")
-np.savetxt(save2, phase, delimiter=",")
-#pl.plot(H_app[0:N]*1000,np.mean(M[:,2,:],axis=0), color='darkblue', linewidth = 0.5)
-#amp = np.array([10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200])
-pl.plot(amp,Har[3,:])
-pl.show()
-
-"""
-"""
-#MPS moment/axis/hysteresis
-
-
-#pl.plot(T,np.mean(M[:,2,:],axis=0), color='darkblue', linewidth = 0.5)
-
-#pl.plot(Axes[0,2,:])
-#pl.plot(M[0,2,:], color='darkblue', linewidth = 0.5)
-
-#motion = np.zeros((N,2))
-#motion[:,0] = np.mean(Axes[:,2,:],axis=0)
-#motion[:,1] = np.mean(M[:,2,:],axis=0)
-
-hystX = np.zeros((N,3,X))
-for xx in range(X):
-	initialize()
-	thermalize(300)
-	runMC(300,0)
-	hystX[:,0,xx] = H_app_z[0:N]*1000
-	hystX[:,1,xx] = np.mean(M[:,1,:],axis=0)
-	hystX[:,2,xx] = np.mean(M[:,2,:],axis=0)
-	print xx
-
-
-hyst = np.mean(hystX, axis=2)
-
-
-np.savetxt(save1, hyst, delimiter=",")
-#np.savetxt(save2, np.mean(M[:,2,:],axis=0), delimiter=",")
-
-#pl.plot(hyst[:,0],hyst[:,1])
-#pl.plot(hyst[190000:,0],hyst[190000:,1])
-#pl.plot(hyst[:10000,0],hyst[:10000,1])
-
-#pl.ylabel('Magnetic Moment')
-#pl.xlabel('Mag Field')
-#pl.title('18nm, 310 K')
-#pl.ylim([-1.1,1.1])
-#pl.xlim([-100,100])
-#pl.show()
-pl.plot(hyst[:,0],hyst[:,2])
-pl.show()
-
-pl.plot(hyst[0,2])
-pl.plot(Axes[0,2,:])
-pl.show()
-
-pl.plot(hyst[0,2])
-pl.plot(Axesx[0,2,:])
-pl.show()
-
-pl.plot(hyst[0,2])
-pl.plot(Axesy[0,2,:])
-pl.show()
-"""
-
-"""
-#for calculating relaxation time
-
-Zmax = np.max(hyst[:,1])
-#tau = 0
-#for n in range(N):
-#	if np.abs(hyst[n,1]) < Zmax - tauPercent*Zmax:
-#		tau += 1
-
-#tau /= 2
-#tau *= 1e-8
-tau0 = np.sqrt(np.pi)*Ms*(2*lam*gamma*K*2)**(-1)
-vol = (4/3.)*np.pi*(diam1/2.)**3
-volH = (4/3.)*np.pi*((diam1+coating)/2.)**3
-sig = K*vol*(kb*297)**(-1)
-tauN = tau0*np.exp(sig)*(sig)**(-0.5)
-tauB = 3*volH*eta*(kb*297)**(-1)
-tauE = tauB*tauN*(tauB+tauN)**(-1)
-
-y = np.arange(N)
-
-
-yhat = savitzky_golay(hyst[:,1], 51, 3)
-#yhat2 = savitzky_golay(yhat, 51, 3)
-q = 15
-x = np.arange(q)
-popt, pcov = curve_fit(func, x, hyst[N/5:N/5+q,1], maxfev=1000)
-z = np.polyfit(x,np.log(hyst[N/5:N/5+q,1]),1)
-p = np.poly1d(z)
-
-#pl.plot(hyst[:,0],yhat, color='darkblue', linewidth = 0.5)
-#pl.plot(yhat, color='darkblue', linewidth = 0.5)
-#pl.plot(x, yhat[N/5:N/5+20], color='darkblue', linewidth = 0.5)
-pl.plot(x, np.log(hyst[N/5:N/5+q,1]))
-#pl.plot(x, func(y[N/5:N/5+20],*popt), color='red')
-pl.plot(x, p(x), color='red')
-print z
-
-pl.ylabel('Magnetic Moment')
-pl.xlabel('Mag Field')
-pl.title('297 K')
-pl.show()
-"""
-
-"""
-#for evaluating taus from Debye model
-
-diam1 = 10e-9
-acs = np.zeros((Fsteps,21))
-taus = np.zeros((5,20))
-for j in range(20):
-	sizes = np.random.lognormal(np.log(diam1), sigma, I)
-	volumes = (4/3.)*np.pi*(sizes/2.)**3   #create array of volumes
-	h_volumes = (4/3.)*np.pi*((sizes+40e-9)/2.)**3   #hydrodynamic volumes (calculate later)
-	xx1, xx2 = mainF()
-	acs[:,j] = xx2[:,1]
-	#pl.plot(xx2[:,0],xx2[:,1])
-	#pl.show()
-	taus[0,j] = (xx2[np.where(xx2[:,1] == np.max(xx2[:,1])),0])**(-1)
-
-	vol = (4/3.)*np.pi*(diam1/2.)**3
-	volH = (4/3.)*np.pi*((diam1+coating)/2.)**3
-	sig = K*vol*(kb*297)**(-1)
-	tau0 = np.sqrt(np.pi)*Ms*(2*lam*gamma*K*2)**(-1)
-	taus[1,j] = tau0*np.exp(sig)*(sig)**(-0.5)
-	taus[2,j] = 3*volH*eta*(kb*297)**(-1)
-	taus[3,j] = taus[1,j]*taus[2,j]*(taus[1,j]+taus[2,j])**(-1)
-	taus[4,j] = diam1
-
-	print diam1
-	diam1 += 1e-9
-
-acs[:,20] = xx2[:,0]
-np.savetxt("tau_K9000_ac_5mT_g.csv", taus, delimiter=",")
-np.savetxt("ac_K9000_ac_5mT_g.csv", acs, delimiter=",")
-"""
-"""
-taus = np.zeros((5,5,20))   #simulations, neel, brownian, reduced
-tau0 = np.sqrt(np.pi)*Ms*(2*lam*gamma*K*2)**(-1)
-diam1 = 10e-9
-for j in range(20):
-	for xx in range(5):
-		sizes = np.random.lognormal(np.log(diam1), sigma, I)
-		volumes = (4/3.)*np.pi*(sizes/2.)**3   #create array of volumes
-		h_volumes = (4/3.)*np.pi*((sizes+40e-9)/2.)**3   #hydrodynamic volumes (calculate later)
-		initialize()
-		thermalize(297)
-		runMC(297,0)
-		hyst = np.zeros((N,2))
-		hyst[:,0] = H_app[0:N]*1000
-		hyst[:,1] = np.mean(M[:,2,:],axis=0)
-		#pl.plot(hyst[:,1])
-		#pl.show()
-
-		#q = 15
-		#x = np.arange(q)
-		#z = np.polyfit(x,np.log(hyst[N/5:N/5+q,1]),1)
-		#taus[xx,0,j] = -(z[0])**(-1)
-		#taus[xx,0,j] *= 1e-8
-
-		Zmax = np.max(hyst[:,1])
-		tau = 0
-		for n in range(N):
-			if np.abs(hyst[n,1]) < Zmax - tauPercent*Zmax:
-				tau += 1
-
-		tau /= 2
-		tau *= 1e-8
-		taus[xx,0,j] = tau
-
-		vol = (4/3.)*np.pi*(diam1/2.)**3
-		volH = (4/3.)*np.pi*((diam1+coating)/2.)**3
-		sig = K*vol*(kb*297)**(-1)
-		taus[xx,1,j] = tau0*np.exp(sig)*(sig)**(-0.5)
-		taus[xx,2,j] = 3*volH*eta*(kb*297)**(-1)
-		taus[xx,3,j] = taus[xx,1,j]*taus[xx,2,j]*(taus[xx,1,j]+taus[xx,2,j])**(-1)
-		taus[xx,4,j] = diam1
-
-
-	print diam1
-	diam1 += 1e-9
-
-tau = np.mean(taus, axis=0)
-np.savetxt("tau_K9000_hyst90.csv", tau, delimiter=",")
-
-#pl.plot(yhat)
-#pl.plot(H_app)
-#pl.show()
-#pl.plot(hyst[N/5:N/5+100,1])
-#pl.show()
-
-#np.savetxt("cubic_test_boff_K25te.csv", yhat, delimiter=",")
-"""
-
-"""
-#for calculating PSF
-
-yhat = savitzky_golay(np.mean(M[:,2,:],axis=0), 51, 3)
-yhat2 = savitzky_golay(yhat, 51, 3)
-pl.plot(H_app[0:N]*1000,yhat2, color='darkblue', linewidth = 0.5)
-pl.show()
-
-dMdH = np.zeros((N-1,3))
-dMdH[:,0] = H_app[0:N-1]*1000
-dMdH[:,1] = np.diff(yhat2)/np.diff(H_app[0:N]*1000)
-dMdH[:,2] = yhat2[0:N-1]
-pl.plot(H_app[0:N-1]*1000, dMdH[:,1])
-pl.ylim(0,0.3)
-pl.show()
-
-#pl.plot(np.mean(Axes[:,2,:],axis=0))
-#pl.plot(np.mean(M[:,2,:],axis=0), color='darkblue', linewidth = 0.5)
-#pl.show()
-
-"""
-
-"""
-#for calculating PSF for multiple sizes
-
-dMdH = np.zeros((N-1,3,22))
-der = np.zeros((3,N-1,22))
-der2 = np.zeros((3,N-1,22))
-diam1 = 18e-9
-for q in range(22):
-	for xx in range(3):
-		sizes = np.random.lognormal(np.log(diam1), sigma, I)
-		volumes = (4/3.)*np.pi*(sizes/2.)**3   #create array of volumes
-		h_volumes = (4/3.)*np.pi*((sizes+40e-9)/2.)**3   #hydrodynamic volumes (calculate later)
-		initialize()
-		thermalize(300)
-		runMC(300)
-		yhat = savitzky_golay(np.mean(M[:,2,:],axis=0), 51, 3)
-		yhat2 = savitzky_golay(yhat, 51, 3)
-		der[xx,:,q] = np.diff(yhat2)/np.diff(H_app[0:N]*1000)
-		der2[xx,:,q] = yhat2[0:N-1]
-
-	print diam1
-	diam1 += 1e-9
-
-dMdH[:,0,:] = H_app[0:N-1,None]*1000
-dMdH[:,1,:] = np.mean(der, axis = 0)
-dMdH[:,2,:] = np.mean(der2, axis = 0)
-pl.plot(H_app[0:N-1]*1000, dMdH[:,1,0])
-pl.ylim(0,0.3)
-pl.show()
-
-np.savetxt("dMdH_K12000_H.csv", dMdH[:,0,:], delimiter=",")
-np.savetxt("dMdH_K12000_psf.csv", dMdH[:,1,:], delimiter=",")
-np.savetxt("dMdH_K12000_hyst.csv", dMdH[:,2,:], delimiter=",")
-
-"""
 hystX = np.zeros((N,2,X))
 
 for xx in range(X):
@@ -1116,15 +752,26 @@ for xx in range(X):
 	thermalize(temperature)
 	runMC(temperature,0)
 	hystX[:,0,xx] = H_app_z[0:N]*1000
-	hystX[:,1,xx] = np.mean(M[:,2,:],axis=0)
-	#print(xx)
+	if np.isnan(M[:,2,:]).any() == True:
+		print("Iteration " + str(xx + 1) + " skipped from nan")
+	else:
+		hystX[:,1,xx] = np.mean(M[:,2,:],axis=0)
+		print("Iteration " + str(xx + 1) + " successful")
 
 hyst = np.mean(hystX, axis=2)
+
+cut_point = int(N/cycs * (cycs-1))
+hyst = hyst[cut_point:]
+
 np.savetxt(save1, hyst, delimiter=",")
 
-#pl.plot(hyst[:,0],hyst[:,1])
-#pl.plot(hyst[:,1])
-#pl.ylabel('Magnetic Moment')
-#pl.xlabel('Mag Field')
-#pl.show()
+"""
+pl.axvline(x = 0, color = "black", linewidth = 0.5)
+pl.axhline(y = 0, color = "black", linewidth = 0.5)
+pl.plot(hyst[:,0],hyst[:,1])
+# pl.plot(hyst[:,1])
+pl.ylabel('Magnetic Moment')
+pl.xlabel('Mag Field')
+pl.show()
+"""
 
