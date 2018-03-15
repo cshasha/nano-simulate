@@ -1,13 +1,16 @@
-import numpy as np
-import pylab as pl
-import itertools
-from numpy.matlib import repmat, repeat
-import numpy.ma as ma
+#from mpl_toolkits.mplot3d import axes3d
+from datetime import datetime, timedelta
+from decimal import Decimal
+from functools import reduce
 from math import factorial
+from numpy.matlib import repmat, repeat
 from scipy.optimize import curve_fit
-import warnings
+import itertools
+import numpy as np
+import numpy.ma as ma
+import os.path, sys, time, warnings
+import pylab as pl
 warnings.filterwarnings("ignore")
-import os.path
 
 
 #---about output:
@@ -18,10 +21,12 @@ import os.path
 # to turn off, comment out "pl.show()", the last line of the program. the iteration number
 # is printed (up to X)
 
+# w = float(sys.argv[1])
+w = 1
 
 #---parameters---
-I = 10   #number of particles
-N = 10000   #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
+I = 100   #number of particles
+N = 10000  #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
 X = 1   #number of repetitions
 
 cluster = 0   #0 = no cluster (random). 1 = chain. 2 = + (I = 5)
@@ -40,7 +45,7 @@ freqs = np.logspace(minF,maxF,num=Fsteps)
 save = "test"   #filename.csv
 text = save + ".txt"
 save1 = save + ".csv"
-#save2 = "hyst_16nm_20mT_frozen_2D_z.csv"   #filename.csv
+
 interactions = "off"   #"on" or "off"
 brownian = "on"   #on or off
 aligned = "no"   #yes or no. if yes, sets all axes and moments to z direction
@@ -53,36 +58,39 @@ C = 1e15   #concentration
 
 h0 = .02  #applied field amp (T/mu0). 10 Oe = 0.001 T
 f = 26000   #frequency (Hz)
-cycs = 1   #number of field cycles
+cycs = 2   #number of field cycles
 twoD = "off"   #on or off
 N *= cycs
 
 num_sizes = 1   #number of different sizes (1 or 2)
-diam1 = 25e-9   #average particle diameter 1
-diam2 = 25e-9   #second average diameter
-sigma = .01   #polydispersity index. typical good: 0.05
+diam1 = 27.7e-9   #average particle diameter 1
+diam2 = diam1   #second average diameter
+sigma = .07   #polydispersity index. typical good: 0.05
 #s = 3.2e-9
 #sigma = np.sqrt(np.log(1 + s**2*diam1**(-2)))
-coating = 40e-9   #added diameter due to coating
+hydro = 50e-9
+coating = hydro - diam1   #added diameter due to coating
 
 shape = "c"   #either "u" for uniaxial or "c" for cubic
-
+ 
 tauPercent = 0.1
 
-K = -20000.   #anisotropy constant (J/m^3). 1 J/m^3 = 10 erg/cm^3
+KB = -13000
+KS = -5.1e-5
+K = KB + 6*KS/diam1   #anisotropy constant (J/m^3). 1 J/m^3 = 10 erg/cm^3
 K2 = -5000.
-#sd = 3000.   #standard deviation of K
-sd = 1.
-k_sigma = np.sqrt(np.log(1 + sd**2*abs(K)**(-2)))   #variance for k values
+k_sigma = 2*sigma #variance for k values
 rho = 4.9e6   #np density (g/m^3)
-gamma = 1.3e9   #gyromag ratio (Hz/T) 1.3e9
-#gamma = 1.76e11
+#gamma = 1.3e9   #gyromag ratio (Hz/T) 1.3e9
+gyro = 1.76e11
 lam = 1   #damping
-Ms = 420000.   #saturation magnetization in A/m (420000 for Magnetite) scaled - bulk values 476k magnetite, 426k maghemite. 367.5?
+Ms = 360000.   #saturation magnetization in A/m (420000 for Magnetite) scaled - bulk values 476k magnetite, 426k maghemite. 367.5?
 M0 = 491511.   #magnetization at 0K, for Bloch's law
 a = 1.5   #values for Bloch's law
 b = 2.8e-5   #values for Bloch's law
 eta = 8.9e-4   #viscosity. water: 8.9e-4 in Pa*s = kg/m/s. viscosity of air = 1.81e-5
+H_k = 2*np.abs(K)/(Ms)
+gamma = gyro*H_k/(2*np.pi)
 
 temperature = 300.
 
@@ -99,7 +107,7 @@ rAvg = 3**(1/2.)*C**(-1/3.)  #estimated avg interparticle distance
 
 w = 2*np.pi*f   #angular frequency (Rad/sec). constraint: f*N must be integer
 dt = cycs*(f*N)**(-1)   #time step
-#dt = 1e-9
+#dt = 1e-12
 T = np.arange(0,dt*N,dt)   #array of time steps
 
 
@@ -110,8 +118,8 @@ nx = np.zeros((I,3))
 ny = np.zeros((I,3))
 Axes = np.zeros((I,3,N))   #initialize anisotropy axes
 
-XX1 = np.zeros((X,int((maxT-minT)/tstep)+1,2))   #initialize matrices of susceptibilities
-XX2 = np.zeros((X,int((maxT-minT)/tstep)+1,2))
+#XX1 = np.zeros((X,int((maxT-minT)/tstep)+1,2))   #initialize matrices of susceptibilities
+#XX2 = np.zeros((X,int((maxT-minT)/tstep)+1,2))
 #XF1 = np.zeros((X,Fsteps,2))   #initialize matrices of susceptibilities
 #XF2 = np.zeros((X,Fsteps,2))
 
@@ -132,6 +140,18 @@ k_values2 *= np.sign(K2)
 betas = Ms**(-1)*k_values   #create array of betas if Ms is constant
 betas2 = Ms**(-1)*k_values2   #create array of betas
 
+def timeit(method):
+	def timed(*args, **kw):
+		ts = time.time()
+		result = method(*args, **kw)
+		te = time.time()
+		microsec = timedelta(microseconds=(te-ts)*1000*1000)
+		d = datetime(1,1,1) + microsec
+		print(method.__name__ +  " %d:%d:%d:%d.%d" % (d.day-1, d.hour, d.minute, d.second, d.microsecond/1000))
+		return result
+	return timed
+
+@timeit
 def initialize():
 	global M 
 	global mcGhost
@@ -152,9 +172,20 @@ def initialize():
 		M_coords = np.random.rand(I,3)*L   #positions of particles. need to add limits
 	if cluster == 1:
 		M_coords = np.zeros((I,3))
+		c_theta = np.random.rand(1)*np.pi/2.
+		c_phi = np.random.rand(1)*np.pi/2.
+		#fig = pl.figure()
+		#ax = fig.add_subplot(111, projection='3d')
 		for c in range(I):
-			M_coords[c,2] = c*diam1
+			#M_coords[c,2] = c*diam1
 			#M_coords[c,0] = c*diam1
+			M_coords[c,0] = c*diam1*np.sin(c_theta)*np.cos(c_phi)
+			M_coords[c,1] = c*diam1*np.sin(c_theta)*np.sin(c_phi)
+			M_coords[c,2] = c*diam1*np.cos(c_theta)
+			#ax.scatter(M_coords[c,0], M_coords[c,1], M_coords[c,2], c='m')
+
+		#pl.show()
+
 	if cluster == 2:
 		M_coords = np.zeros((I,3))
 		M_coords[0,0] = diam1
@@ -224,7 +255,8 @@ def initialize():
 	H_dip = np.zeros((I,3))
 	H_app_z = h0*np.cos(w*T)
 	if twoD == "on":
-		H_app_y = h0*np.sin(w*T)
+		w2 = 1.05*w
+		H_app_y = h0*np.sin(w2*T)
 	else:
 		H_app_y = 0*np.sin(w*T)
 	
@@ -288,25 +320,35 @@ def initialize():
 def makeGhost(mcGhost, n):
 	mGhost = M[:,:,n]
 
-	mGhost = np.vstack((mGhost,mGhost[g_mask_x1]))
-	mGhost = np.vstack((mGhost,mGhost[g_mask_x2]))
+	mX1 = np.copy(mGhost[g_mask_x1])
+	mX2 = np.copy(mGhost[g_mask_x2])
 
-	mGhost = np.vstack((mGhost,mGhost[g_mask_y1]))
-	mGhost = np.vstack((mGhost,mGhost[g_mask_y2]))
+	mGhost = np.vstack((mGhost,mX1))
+	mGhost = np.vstack((mGhost,mX2))
 
-	mGhost = np.vstack((mGhost,mGhost[g_mask_z1]))
-	mGhost = np.vstack((mGhost,mGhost[g_mask_z2]))
+	mY1 = np.copy(mGhost[g_mask_y1])
+	mY2 = np.copy(mGhost[g_mask_y2])
+
+	mGhost = np.vstack((mGhost,mY1))
+	mGhost = np.vstack((mGhost,mY2))
+
+	mZ1 = np.copy(mGhost[g_mask_z1])
+	mZ2 = np.copy(mGhost[g_mask_z2])
+
+	mGhost = np.vstack((mGhost,mZ1))
+	mGhost = np.vstack((mGhost,mZ2))
 
 	return mGhost
 
 #---thermalizes for N/5 steps
+@timeit
 def thermalize(temp):
 	#Ms = M0*(1 - b*temp**a)
 	global nx, ny
 	betas = Ms**(-1)*k_values
 	betas2 = Ms**(-1)*k_values2
 	d = (1+lam**2)*kb*(gamma*Ms*lam)**(-1) 
-	for n in range(N-1):
+	for n in range(int(N/3)):
 		dW = np.random.normal(loc = 0.0, scale = 1, size = (I,3))
 		dW *= np.sqrt(dt*2*d*temp*volumes[:,None]**(-1))
 
@@ -350,8 +392,6 @@ def thermalize(temp):
 			nb = Axes[:,:,n] + (6*eta*h_volumes[:,None])**(-1)*(np.cross(Torque,Axes[:,:,n])*dt + np.cross(dT,Axes[:,:,n]))
 			norm_n = np.sqrt(np.einsum('...i,...i', nb, nb))
 			nb /= norm_n[:,None]
-			if interactions == "on":
-				hbar += H_dip
 			if shape == "u":
 				tbar = 2*(k_values*volumes)[:,None]*np.absolute(np.sum(mb*nb,axis=1))[:,None]*np.cross(nb,mb)
 				hbar = 2*betas[:,None]*np.sum(mb*nb,axis=1)[:,None]*nb
@@ -365,7 +405,8 @@ def thermalize(temp):
 					   -2*(k_values*volumes)[:,None]*(myb**2 + mzb**2)*mxb*np.cross(nxb,mb) - 2*(k_values2*volumes)[:,None]*myb**2*mzb**2*mxb*np.cross(nxb,mb) \
 					   -2*(k_values*volumes)[:,None]*(mzb**2 + mxb**2)*myb*np.cross(nyb,mb) - 2*(k_values2*volumes)[:,None]*mzb**2*mxb**2*myb*np.cross(nyb,mb)
 				hbar = -betas[:,None]*(mxb**2*mzb*nb + myb**2*mzb*nb + mxb**2*myb*nyb + mzb**2*myb*nyb + myb**2*mxb*nxb + mzb**2*mxb*nxb) - 2*betas2[:,None]*(mxb**2*myb**2*mzb*nb + mxb**2*mzb**2*myb*nyb + myb**2*mzb**2*mxb*nxb)
-
+			if interactions == "on":
+				hbar += H_dip
 			Axes[:,:,n+1] = Axes[:,:,n] + (6*eta*h_volumes[:,None])**(-1)*0.5*(dt*(np.cross(Torque,Axes[:,:,n]) + np.cross(tbar,nb)) + np.cross(dT,Axes[:,:,n]) + np.cross(dT,nb))
 			norm2 = np.sqrt(np.einsum('...i,...i', Axes[:,:,n+1], Axes[:,:,n+1]))
 			Axes[:,:,n+1] /= norm2[:,None]
@@ -417,10 +458,10 @@ def thermalize(temp):
 	Axes[:,:,0] = np.copy(Axes[:,:,int(N/5)])
 	return M
 
-
+@timeit
 def runMC(temp, bias):
 	#Ms = M0*(1 - b*temp**a)
-	global nx, ny
+	global nx, ny, U1
 	betas = Ms**(-1)*k_values
 	betas2 = Ms**(-1)*k_values2
 	d = (1+lam**2)*kb*(gamma*Ms*lam)**(-1) 
@@ -434,7 +475,6 @@ def runMC(temp, bias):
 		if brownian == "on":
 			dT = np.random.normal(loc = 0.0, scale = 1, size = (I,3))
 			dT *= np.sqrt(dt*12*kb*temp*eta*h_volumes[:,None])
-			dT *= 0
 				
 		if shape == "u":
 			if brownian == "on":
@@ -445,6 +485,9 @@ def runMC(temp, bias):
 			mx = np.sum(M[:,:,n]*nx,axis=1)[:,None]
 			my = np.sum(M[:,:,n]*ny,axis=1)[:,None]
 			mz = np.sum(M[:,:,n]*Axes[:,:,n],axis=1)[:,None]
+			#print(nx)
+			#print(my)
+			#print(mz)
 			if brownian == "on":
 				Torque = -2*(k_values*volumes)[:,None]*(my**2 + mx**2)*mz*np.cross(Axes[:,:,n],M[:,:,n]) - 2*(k_values2*volumes)[:,None]*my**2*mx**2*mz*np.cross(Axes[:,:,n],M[:,:,n]) \
 					     -2*(k_values*volumes)[:,None]*(my**2 + mz**2)*mx*np.cross(nx,M[:,:,n]) - 2*(k_values2*volumes)[:,None]*my**2*mz**2*mx*np.cross(nx,M[:,:,n]) \
@@ -471,17 +514,18 @@ def runMC(temp, bias):
 			H_dip = np.sum(Q.filled(0)[0:I,:,:],axis=1)
 			H += H_dip
 		
+		#print(M[:,:,n])
 		mb = M[:,:,n] + gamma*(1+lam**2)**(-1)*((np.cross(M[:,:,n],H) - lam*np.cross(M[:,:,n], np.cross(M[:,:,n],H)))*dt + np.cross(M[:,:,n],dW) - lam*np.cross(M[:,:,n], np.cross(M[:,:,n],dW)))
 		norm_m = np.sqrt(np.einsum('...i,...i', mb, mb))
 		mb /= norm_m[:,None]
-
+		#print(H)
+		#print(mb)
 		if brownian == "on":
 			nb = Axes[:,:,n] + (6*eta*h_volumes[:,None])**(-1)*(np.cross(Torque,Axes[:,:,n])*dt + np.cross(dT,Axes[:,:,n]))
 			norm_n = np.sqrt(np.einsum('...i,...i', nb, nb))
+			#print(norm_n)
 			nb /= norm_n[:,None]
 			
-			if interactions == "on":
-				hbar += H_dip
 			if shape == "u":
 				tbar = 2*(k_values*volumes)[:,None]*np.absolute(np.sum(mb*nb,axis=1))[:,None]*np.cross(nb,mb)
 				hbar = 2*betas[:,None]*np.sum(mb*nb,axis=1)[:,None]*nb
@@ -501,7 +545,8 @@ def runMC(temp, bias):
 			
 				#hbar = 2*betas[:,None]*np.sum(mb*nb,axis=1)[:,None]*nb
 				#tbar = 2*(k_values*volumes)[:,None]*np.absolute(np.sum(mb*nb,axis=1))[:,None]*np.cross(nb,mb)
-
+			if interactions == "on":
+				hbar += H_dip
 			hbar[:,1] += H_app_y[n+1]	
 			hbar[:,2] += H_app_z[n+1] + H_bias[n+1]  #added bias here
 			#print(hbar)	
@@ -533,9 +578,24 @@ def runMC(temp, bias):
 
 		if shape == "c" and brownian == "on":
 			U = np.cross(Axes[:,:,n],Axes[:,:,n+1],axis=1)
+			if np.any(np.isnan(U)) == 1:
+				print('trueU')
+				U = U1
+
 			U /= np.sqrt(U[:,0]**2 + U[:,1]**2 + U[:,2]**2)[:,None]
+			U1 = U
+			#j = np.sum(Axes[:,:,n]*Axes[:,:,n+1],axis=1)
+			#al = np.arccos(j)
 			al = np.arccos(np.sum(Axes[:,:,n]*Axes[:,:,n+1],axis=1))
-			#print(al)
+			if np.any(np.isnan(al)) == 1:
+				#print('trueA')
+				al.fill(0)
+
+			#print(j)
+			#print('%e' % Axes[0,0,n])
+			#print('%e' % Axes[0,1,n])
+			#print('%e' % Axes[0,2,n])
+			#print(U)
 			Rot = np.array([[np.cos(al) + (U[:,0]**2)*(1 - np.cos(al)), U[:,0]*U[:,1]*(1 - np.cos(al)) - U[:,2]*np.sin(al), U[:,0]*U[:,2]*(1 - np.cos(al)) + U[:,1]*np.sin(al)],[U[:,0]*U[:,1]*(1 - np.cos(al)) + U[:,2]*np.sin(al), np.cos(al) + (U[:,1]**2)*(1 - np.cos(al)), U[:,2]*U[:,1]*(1 - np.cos(al)) - U[:,0]*np.sin(al)],[U[:,0]*U[:,2]*(1 - np.cos(al)) - U[:,1]*np.sin(al),U[:,2]*U[:,1]*(1 - np.cos(al)) + U[:,0]*np.sin(al), np.cos(al) + (U[:,2]**2)*(1 - np.cos(al))]])
 			nx2 = np.zeros((I,3))
 			ny2 = np.zeros((I,3))
@@ -545,7 +605,8 @@ def runMC(temp, bias):
 
 			nx = nx2
 			ny = ny2
-
+			#print(Rot[:,:,:])
+			"""
 			al2 = np.sqrt(dW[:,0]**2 + dW[:,1]**2 + dW[:,2]**2)
 			nx3 = np.zeros((I,3))
 			ny3 = np.zeros((I,3))
@@ -556,15 +617,23 @@ def runMC(temp, bias):
 			
 			nx = nx3
 			ny = ny3
+			"""
 
 		vstep = (N)**(-1)
-		vect = np.arange(vstep,1+vstep,vstep)
+		#vect = np.arange(vstep,1+vstep,vstep)
+		#vect = np.logspace(vstep,1,num=N)
+		#vect /= 10
 		#vect *=20
-		#if n > 9000:
-		#pl.plot(Axes[:,0,n], Axes[:,2,n], linestyle = 'none', marker = '.',color = 'blue', alpha = vect[n])
-		#pl.plot(M[:,0,n], M[:,2,n], linestyle = 'none', marker = '.',color = 'm', alpha = vect[n])
+		#if n % 10 == 0:
+		#	pl.plot(Axes[:,1,n], Axes[:,2,n], linestyle = 'none', marker = '.',color = 'blue', alpha = vect[n])
+		#	pl.plot(M[:,1,n], M[:,2,n], linestyle = 'none', marker = '.',color = 'm', alpha = vect[n])
 		#pl.plot(nx[:,0], nx[:,2], linestyle = 'none', marker = '.',color = 'red', alpha = vect[n])
 		#pl.plot(ny[:,0], ny[:,2], linestyle = 'none', marker = '.',color = 'c', alpha = vect[n])
+		#if n % 1000 == 0:
+		#	print(M[:,:,n+1])
+		#	print(n)
+		#print(H)
+		#print(Torque)
 
 
 	#pl.ylim([-0.1,1.1])
@@ -670,16 +739,6 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
 	y = np.concatenate((firstvals, y, lastvals))
 	return np.convolve( m[::-1], y, mode='valid')
 
-
-hystX = np.zeros((N,2,X))
-
-for xx in range(X):
-	initialize()
-	thermalize(temperature)
-	runMC(temperature,0)
-	hystX[:,0,xx] = H_app_z[0:N]*1000
-	hystX[:,1,xx] = np.mean(M[:,2,:],axis=0)
-	print(xx)
 
 
 """
@@ -1062,13 +1121,32 @@ np.savetxt("dMdH_K12000_psf.csv", dMdH[:,1,:], delimiter=",")
 np.savetxt("dMdH_K12000_hyst.csv", dMdH[:,2,:], delimiter=",")
 
 """
+hystX = np.zeros((N,2,X))
+
+
+for xx in range(X):
+	initialize()
+	thermalize(temperature)
+	runMC(temperature,0)
+	hystX[:,0,xx] = H_app_z[0:N]*1000
+	if np.isnan(M[:,2,:]).any() == True:
+		print("Iteration " + str(xx + 1) + " skipped from nan")
+	else:
+		hystX[:,1,xx] = np.mean(M[:,2,:],axis=0)
+		print("Iteration " + str(xx + 1) + " successful")
 
 hyst = np.mean(hystX, axis=2)
+
+cut_point = int(N/cycs * (cycs-1))
+hyst = hyst[cut_point:]
+
 np.savetxt(save1, hyst, delimiter=",")
 
-#pl.plot(hyst[:,0],hyst[:,1])
-#pl.plot(hyst[:,1])
-#pl.ylabel('Magnetic Moment')
-#pl.xlabel('Mag Field')
-#pl.show()
+pl.axvline(x = 0, color = "black", linewidth = 0.5)
+pl.axhline(y = 0, color = "black", linewidth = 0.5)
+pl.plot(hyst[:,0],hyst[:,1])
+# pl.plot(hyst[:,1])
+pl.ylabel('Magnetic Moment')
+pl.xlabel('Mag Field')
+pl.show()
 
