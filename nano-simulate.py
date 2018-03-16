@@ -25,7 +25,7 @@ warnings.filterwarnings("ignore")
 w = 1
 
 #---parameters---
-I = 100   #number of particles
+I = 10   #number of particles
 N = 10000  #number of time steps (min 10000-1000000). dt = 1e-8 at least (ideally 1e-10)
 X = 1   #number of repetitions
 
@@ -54,7 +54,7 @@ aligned = "no"   #yes or no. if yes, sets all axes and moments to z direction
 kb = 1.381e-23   #boltzmann constant
 mu0 = 1e-7   #mu0/4pi 
 
-#C = 1e15   #concentration
+C = 1e15   #concentration
 
 h0 = .02  #applied field amp (T/mu0). 10 Oe = 0.001 T
 f = 25500   #frequency (Hz)
@@ -69,7 +69,8 @@ sigma = .07   #polydispersity index. typical good: 0.05
 #s = 3.2e-9
 #sigma = np.sqrt(np.log(1 + s**2*diam1**(-2)))
 hydro = 50e-9
-coating = hydro - diam1   #added diameter due to coating
+#coating = hydro - diam1   #added diameter due to coating
+h_sigma = 0.1
 
 shape = "c"   #either "u" for uniaxial or "c" for cubic
  
@@ -96,7 +97,7 @@ gamma = gyro*H_k/(2*np.pi)
 
 temperature = 300.
 
-np.savetxt(text, ["I = %d\nN = %d\nX = %d\ncluster=%d\ninteractions=%s\nbrownian=%s\naligned=%s\nconcentration=%E\nh0=%f\nf=%f\ncycs=%d\ntwoD=%s\nnumsizes=%d\ndiam1=%E\ndiam2=%E\nsigma=%f\ncoating=%E\nshape=%s\nK=%d\nlambda=%f\nviscosity=%E" % (I,N,X,cluster,interactions,brownian,aligned,C,h0,f,cycs,twoD,num_sizes,diam1,diam2,sigma,coating,shape,K,lam,eta)], fmt='%s')
+np.savetxt(text, ["I = %d\nN = %d\nX = %d\ncluster=%d\ninteractions=%s\nbrownian=%s\naligned=%s\nconcentration=%E\nh0=%f\nf=%f\ncycs=%d\ntwoD=%s\nnumsizes=%d\ndiam1=%E\ndiam2=%E\nsigma=%f\nhydro=%E\nshape=%s\nK=%d\nlambda=%f\nviscosity=%E" % (I,N,X,cluster,interactions,brownian,aligned,C,h0,f,cycs,twoD,num_sizes,diam1,diam2,sigma,hydro,shape,K,lam,eta)], fmt='%s')
 
 if os.path.isfile(save1):
 	print('file exists')
@@ -126,6 +127,7 @@ Axes = np.zeros((I,3,N))   #initialize anisotropy axes
 #XF2 = np.zeros((X,Fsteps,2))
 
 sizes = np.zeros(I)   #create size distribution
+h_sizes = np.random.lognormal(np.log(hydro), sigma, I)
 if num_sizes == 1:
 	sizes = np.random.lognormal(np.log(diam1), sigma, I)
 if num_sizes == 2:
@@ -133,7 +135,7 @@ if num_sizes == 2:
 	sizes[I/2.:I] = np.random.lognormal(np.log(diam2), sigma, I/2.)
 
 volumes = (4/3.)*np.pi*(sizes/2.)**3   #create array of volumes
-h_volumes = (4/3.)*np.pi*((sizes+coating)/2.)**3   #hydrodynamic volumes (calculate later)
+h_volumes = (4/3.)*np.pi*(h_sizes/2.)**3   #hydrodynamic volumes
 
 k_values = np.random.lognormal(np.log(abs(K)), k_sigma, I)   #create array of k values
 k_values *= np.sign(K)
