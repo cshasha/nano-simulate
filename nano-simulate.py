@@ -63,7 +63,6 @@ twoD = "off"   #on or off
 N *= cycs
 
 num_sizes = 1   #number of different sizes (1 or 2)
-
 diam1 = 27.7e-9   #average particle diameter 1
 diam2 = diam1   #second average diameter
 sigma = .07   #polydispersity index. typical good: 0.05
