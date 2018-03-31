@@ -514,8 +514,8 @@ def thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diamet
 		
 		#calculate moment predictor
 		mBar = particleMoments[:,:,n] + gamma*(1+alpha**2)**(-1)*((np.cross(particleMoments[:,:,n],field) \
-			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],field)))*dt + \
-			np.cross(particleMoments[:,:,n],dW) \
+			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],field)))*dt \
+			+ np.cross(particleMoments[:,:,n],dW) \
 			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],dW)))
 		#normalize moment predictor
 		mBar /= np.sqrt(np.einsum('...i,...i', mBar, mBar))[:,None]
@@ -571,7 +571,7 @@ def thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diamet
 			#rotate minor axes
 			particleAxes = rotate_axes(particleAxes, numParticles)
 
-		#copy new particle axes
+		#update particle axes
 		particleAxes[:,:,0] = particleAxes[:,:,1]
 
 		#save configuration
@@ -589,65 +589,103 @@ def run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, di
 	viscosity, temperature, volumes, hVolumes, kValues, k2Values, betas, betas2, shape, brownian, dt, \
 	interactions, ghostCoords, distMatrix, distMatrixSq, masks, hApplied):
 	"""Run simulation with applied field."""
+	#loop over time steps
 	for n in range(numTimeSteps-1):
-		dW = generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, dt, "H")
-
+		#generate thermal fluctuations for field
+		dW = generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, \
+			dt, "H")
+		#calculate direction cosines for cubic anisotropy
 		if shape == "cubic": mx, my, mz = calculate_cosines(particleMoments[:,:,n], particleAxes[:,:,0])
 
 		if brownian == "on": 
-			dT = generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, dt, "T")
-			if shape == "uniaxial": torque = calculate_torque(particleMoments[:,:,n], particleAxes[:,:,0], kValues, volumes, shape)
-			if shape == "cubic": torque = calculate_torque(particleMoments[:,:,n], particleAxes[:,:,0], kValues, volumes, shape, mx, my, mz, k2Values)		
+			#generate thermal fluctuations for torque
+			dT = generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, \
+				hVolumes, dt, "T")
+			#calculate torque on particles
+			if shape == "uniaxial": torque = calculate_torque(particleMoments[:,:,n], particleAxes[:,:,0], \
+				kValues, volumes, shape)
+			if shape == "cubic": torque = calculate_torque(particleMoments[:,:,n], particleAxes[:,:,0], kValues, \
+				volumes, shape, mx, my, mz, k2Values)		
 
-		if shape == "uniaxial": field = calculate_field(particleMoments[:,:,n], particleAxes[:,:,0], betas, shape)
-		if shape == "cubic": field = calculate_field(particleMoments[:,:,n], particleAxes[:,:,0], betas, shape, mx, my, mz, betas2)
+		#calculate field on particles
+		if shape == "uniaxial": field = calculate_field(particleMoments[:,:,n], particleAxes[:,:,0], betas, \
+			shape)
+		if shape == "cubic": field = calculate_field(particleMoments[:,:,n], particleAxes[:,:,0], betas, shape, \
+			mx, my, mz, betas2)
 
+		#add applied field
 		field[:,2] += hApplied[n]
 
 		if interactions == "on":
-			dipoleField = calculate_interaction_field(particleMoments[:,:,n], ghostCoords, distMatrixSq, distMatrix, numParticles, masks, diameter, Ms)
+			#calculate dipole interaction field
+			dipoleField = calculate_interaction_field(particleMoments[:,:,n], ghostCoords, distMatrixSq, \
+				distMatrix, numParticles, masks, diameter, Ms)
+			#add to total field
 			field += dipoleField
 		
+		#calculate moment predictor
 		mBar = particleMoments[:,:,n] + gamma*(1+alpha**2)**(-1)*((np.cross(particleMoments[:,:,n],field) \
-			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],field)))*dt + np.cross(particleMoments[:,:,n],dW) \
+			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],field)))*dt \
+			+ np.cross(particleMoments[:,:,n],dW) \
 			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],dW)))
+		#normalize moment predictor
 		mBar /= np.sqrt(np.einsum('...i,...i', mBar, mBar))[:,None]
 
 		if brownian == "on":
-			nBar = particleAxes[:,:3,0] + (6*viscosity*hVolumes[:,None])**(-1)*(np.cross(torque,particleAxes[:,:3,0])*dt + np.cross(dT,particleAxes[:,:3,0]))
+			#calculate axis predictor
+			nBar = particleAxes[:,:3,0] + (6*viscosity*hVolumes[:,None])**(-1)*(np.cross(torque,particleAxes[:,:3,0])*dt \
+				+ np.cross(dT,particleAxes[:,:3,0]))
+			#normalize axis predictor
 			nBar /= np.sqrt(np.einsum('...i,...i', nBar, nBar))[:,None]
 
+			#calculate torque predictor(s)
 			if shape == "uniaxial": tBar = calculate_torque(mBar, nBar, kValues, volumes, shape)
-				
 			if shape == "cubic":
-				nxBar = particleAxes[:,3:6,0] + (6*viscosity*hVolumes[:,None])**(-1)*(np.cross(torque,particleAxes[:,3:6,0])*dt + np.cross(dT,particleAxes[:,3:6,0]))
-				nyBar = particleAxes[:,6:,0] + (6*viscosity*hVolumes[:,None])**(-1)*(np.cross(torque,particleAxes[:,6:,0])*dt + np.cross(dT,particleAxes[:,6:,0]))
+				nxBar = particleAxes[:,3:6,0] + (6*viscosity*hVolumes[:,None])**(-1)*(np.cross(torque,particleAxes[:,3:6,0])*dt \
+					+ np.cross(dT,particleAxes[:,3:6,0]))
+				nyBar = particleAxes[:,6:,0] + (6*viscosity*hVolumes[:,None])**(-1)*(np.cross(torque,particleAxes[:,6:,0])*dt \
+					+ np.cross(dT,particleAxes[:,6:,0]))
 				nBar = np.concatenate((nBar, nxBar, nyBar), axis=1)
 				mxBar, myBar, mzBar = calculate_cosines(mBar, nBar)
 				tBar = calculate_torque(mBar, nBar, kValues, volumes, shape, mxBar, myBar, mzBar, k2Values)
 
-			particleAxes[:,:3,1] = particleAxes[:,:3,0] + (6*viscosity*hVolumes[:,None])**(-1)*0.5*(dt*(np.cross(torque,particleAxes[:,:3,0]) + np.cross(tBar,nBar[:,:3])) + np.cross(dT,particleAxes[:,:3,0]) + np.cross(dT,nBar[:,:3]))
+			#calculate new particle axes
+			particleAxes[:,:3,1] = particleAxes[:,:3,0] + (6*viscosity*hVolumes[:,None])**(-1)*0.5*(dt*(np.cross(torque,particleAxes[:,:3,0]) \
+				+ np.cross(tBar,nBar[:,:3])) + np.cross(dT,particleAxes[:,:3,0]) + np.cross(dT,nBar[:,:3]))
+			#normalize new particle axes
 			particleAxes[:,:3,1] /= np.sqrt(np.einsum('...i,...i', particleAxes[:,:3,1], particleAxes[:,:3,1]))[:,None]
 
 		else: 
+			#set axis predictors equal
 			nBar, particleAxes[:,:,1] = particleAxes[:,:,0] 
 			if shape == "cubic": mxBar, myBar, mzBar = calculate_cosines(mBar, nBar)
 
+		#calculate field predictors
 		if shape == "uniaxial": hBar = calculate_field(mBar, nBar, betas, shape)
 		if shape == "cubic": hBar = calculate_field(mBar, nBar, betas, shape, mxBar, myBar, mzBar, betas2)
 
+		#add applied field predictor
 		hBar[:,2] += hApplied[n+1]
 
+		#add dipole field predictor
 		if interactions == "on":
 			dipoleFieldBar = calculate_interaction_field(mBar, ghostCoords, distMatrixSq, distMatrix, numParticles, masks, diameter, Ms)
 			hBar += dipoleFieldBar
 
-		particleMoments[:,:,n+1] = particleMoments[:,:,n] + gamma*(1+alpha**2)**(-1)*(0.5*(dt*(np.cross(particleMoments[:,:,n],field) - alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],field)) + np.cross(mBar,hBar) - alpha*np.cross(mBar, np.cross(mBar,hBar))) + np.cross(particleMoments[:,:,n],dW) - alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],dW)) + np.cross(mBar,dW) - alpha*np.cross(mBar, np.cross(mBar,dW))))
+		#calculate new particle moments
+		particleMoments[:,:,n+1] = particleMoments[:,:,n] + gamma*(1+alpha**2)**(-1)*(0.5*(dt*(np.cross(particleMoments[:,:,n],field) \
+			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],field)) + np.cross(mBar,hBar) \
+			- alpha*np.cross(mBar, np.cross(mBar,hBar))) + np.cross(particleMoments[:,:,n],dW) \
+			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],dW)) + np.cross(mBar,dW) \
+			- alpha*np.cross(mBar, np.cross(mBar,dW))))
+		#normalize new particle moments
 		particleMoments[:,:,n+1] /= np.sqrt(np.einsum('...i,...i', particleMoments[:,:,n+1], particleMoments[:,:,n+1]))[:,None]
 
 		if shape == "cubic" and brownian == "on":
+			#rotate minor axes
 			particleAxes = rotate_axes(particleAxes, numParticles)
 
+		#update particle axes
 		particleAxes[:,:,0] = particleAxes[:,:,1]
 
 	return particleMoments
