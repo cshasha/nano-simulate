@@ -468,7 +468,11 @@ def rotate_axes(A, numParticles):
 	#generate angle to rotate around
 	angle = np.arccos(np.sum(A[:,:3,0]*A[:,:3,1],axis=1))
 	#create rotation matrix based on normal vector and angle
-	rotMatrix = np.array([[np.cos(angle) + (U[:,0]**2)*(1 - np.cos(angle)), U[:,0]*U[:,1]*(1 - np.cos(angle)) - U[:,2]*np.sin(angle), U[:,0]*U[:,2]*(1 - np.cos(angle)) + U[:,1]*np.sin(angle)],[U[:,0]*U[:,1]*(1 - np.cos(angle)) + U[:,2]*np.sin(angle), np.cos(angle) + (U[:,1]**2)*(1 - np.cos(angle)), U[:,2]*U[:,1]*(1 - np.cos(angle)) - U[:,0]*np.sin(angle)],[U[:,0]*U[:,2]*(1 - np.cos(angle)) - U[:,1]*np.sin(angle),U[:,2]*U[:,1]*(1 - np.cos(angle)) + U[:,0]*np.sin(angle), np.cos(angle) + (U[:,2]**2)*(1 - np.cos(angle))]])
+	rotMatrix = np.array([[np.cos(angle) + (U[:,0]**2)*(1 - np.cos(angle)), U[:,0]*U[:,1]*(1 - np.cos(angle)) \
+		- U[:,2]*np.sin(angle), U[:,0]*U[:,2]*(1 - np.cos(angle)) + U[:,1]*np.sin(angle)],[U[:,0]*U[:,1]*(1 - np.cos(angle)) \
+		+ U[:,2]*np.sin(angle), np.cos(angle) + (U[:,1]**2)*(1 - np.cos(angle)), U[:,2]*U[:,1]*(1 - np.cos(angle)) \
+		- U[:,0]*np.sin(angle)],[U[:,0]*U[:,2]*(1 - np.cos(angle)) - U[:,1]*np.sin(angle),U[:,2]*U[:,1]*(1 - np.cos(angle)) \
+		+ U[:,0]*np.sin(angle), np.cos(angle) + (U[:,2]**2)*(1 - np.cos(angle))]])
 	#rotate each vector
 	for p in range(3):
 		A[:,3+p,1] = rotMatrix[p,0,:]*A[:,3,0] + rotMatrix[p,1,:]*A[:,4,0] + rotMatrix[p,2,:]*A[:,5,0]
