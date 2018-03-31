@@ -1,4 +1,5 @@
 
+from __future__ import division
 import numpy as np
 import numpy.ma as ma
 import itertools
@@ -17,9 +18,11 @@ mu0 = 1e-7       #permeability/4pi
 gyro = 1.76e11   #gyromagnetic ratio
 #-----------------------
 
-def simulate_MH(numParticles=100, numReps=1, diameter=25, shape="cubic", savefile=None, numTimeSteps=10000, brownian="on", interactions="off", aligned="off", \
-	temperature=300, concentration=1e15, cluster=0, fieldAmp=20, fieldFreq=25, cycles=2, sigma=0.1, hDiameter=50, coating=None, \
-	hSigma=0.1, kBulk=-13000, kSurface=-3.9e-5, K=None, K2=-5000, kSigma=0.2, alpha=1, Ms=420000, viscosity=8.9e-4, time="off", field="ac",cut=10):
+def simulate_MH(numParticles=100, numReps=1, diameter=25, shape="cubic", savefile=None, numTimeSteps=10000, \
+	brownian="on", interactions="off", aligned="off", temperature=300, concentration=1e15, cluster=0, \
+	fieldAmp=20, fieldFreq=25, cycles=2, sigma=0.1, hDiameter=50, coating=None, hSigma=0.1, kBulk=-13000, \
+	kSurface=-3.9e-5, K=None, K2=-5000, kSigma=0.2, alpha=1, Ms=420000, viscosity=8.9e-4, time="off", \
+	field="ac",cut=10):
 
 	"""
 	Main function to simulate M(H) curve.
@@ -28,40 +31,53 @@ def simulate_MH(numParticles=100, numReps=1, diameter=25, shape="cubic", savefil
 		numParticles 	  (int, optional) : number of particles. defaults to 100
 		numReps 		  (int, optional) : number of overall iterations of the simulation. defaults to 1
 		diameter	    (float, optional) : average particle diameter, in nanometers. defaults to 25
-		shape 			  (str, optional) : magnetocrystalline anisotropy. either "cubic" or "uniaxial". defaults to "cubic"
+		shape 			  (str, optional) : magnetocrystalline anisotropy. either "cubic" or "uniaxial". 
+											defaults to "cubic"
 		savefile	 	  (str, optional) : name of file to save (e.g. "test"). defaults to None
 		numTimeSteps      (int, optional) : number of time steps in each iteration. defaults to 10000
-		brownian 	  	  (str, optional) : sets brownian rotation on or off. either "on" or "off". defaults to "on"
-		interactions	  (str, optional) : turns interparticle interactions on or off. either "on" or "off". defaults to "off"
-		aligned 	 	  (str, optional) : sets moments and axes aligned along the z direction. either "on" or "off". defaults to "off"
+		brownian 	  	  (str, optional) : sets brownian rotation on or off. either "on" or "off". 
+											defaults to "on"
+		interactions	  (str, optional) : turns interparticle interactions on or off. either "on" or "off". 
+											defaults to "off"
+		aligned 	 	  (str, optional) : sets moments and axes aligned along the z direction. either "on" 
+											or "off". defaults to "off"
 		temperature 	(float, optional) : temperature in Kelvin. defaults to 300
-		concentration 	(float, optional) : concentration in particles/m^3. relevant when interactions are on. defaults to 1e15
+		concentration 	(float, optional) : concentration in particles/m^3. relevant when interactions are on. 
+											defaults to 1e15
 		cluster 		  (int, optional) : controls cluster type. 0 = no cluster, 1 = chain. defaults to 0
 		fieldAmp        (float, optional) : amplitude of applied field, in mT. defaults to 20
 		fieldFreq       (float, optional) : frequency of applied field, in kHz. defaults to 25
 		cycles			  (int, optional) : number of field cycles. defaults to 2
 		sigma           (float, optional) : distribution parameter for particle diameters. defaults to 0.1
 		hDiameter       (float, optional) : average hydrodynamic diameter in nanometers. defaults to 50
-		coating         (float, optional) : added non-magnetic coating in nanometers. can use in place of hDiameter. defaults to None
+		coating         (float, optional) : added non-magnetic coating in nanometers. can use in place of 
+											hDiameter. defaults to None
 		hSigma			(float, optional) : size distribution parameter for hydrodynamic size. defaults to 0.1
-		kBulk			(float, optional) : bulk anisotropy constant in J/m^3. only relevant for cubic anisotropy. defaults to -13000.
-		kSurface        (float, optional) : surface anisotropy in J/m^3. only relevant for cubic anisotropy. defaults to -3.9e-5
-		K               (float, optional) : uniaxial anisotropy constant in J/m^3, or K1 for cubic anisotropy, if not using bulk/surface. defaults to None
+		kBulk			(float, optional) : bulk anisotropy constant in J/m^3. only relevant for cubic 
+											anisotropy. defaults to -13000.
+		kSurface        (float, optional) : surface anisotropy in J/m^3. only relevant for cubic anisotropy. 
+											defaults to -3.9e-5
+		K               (float, optional) : uniaxial anisotropy constant in J/m^3, or K1 for cubic anisotropy, 
+											if not using bulk/surface. defaults to None
 		K2              (float, optional) : K2 in J/m^3 for cubic anisotropy. defaults to -5000
 		kSigma			(float, optional) : distribution parameter for anisotropy values. defaults to 0.2
 		alpha			(float, optional) : Gilbert damping constant. defaults to 1
 		Ms 				(float, optional) : saturation magnetization in A/m. defaults to 420000
 		viscosity       (float, optional) : medium viscosity, in Pa*s. defaults to 8.9e-4
-		time 			  (str, optional) : turn on to print timestamp after parts of the simulation. defaults to "off"
+		time 			  (str, optional) : turn on to print timestamp after parts of the simulation. 
+											defaults to "off"
 		field  			  (str, optional) : "ac" or "dc". defaults to "ac"
-		cut  			  (int, optional) : cuts data points saved down by a factor. defaults to 10 (saves every 10th point)
+		cut  			  (int, optional) : cuts data points saved down by a factor. defaults to 10 (saves 
+											every 10th point)
 
 	Returns:
-
+		magData					  (array) : first column records applied field, second column records
+											average z magnetization for all particles
 	"""
 	#set initial values
-	gamma, boxLength, rAvg, angFreq, dt, timeSteps, volumes, hVolumes, betas, betas2, kValues, k2Values, fieldAmp = calculate_values(shape, kBulk, \
-		kSurface, K, K2, kSigma, Ms, fieldFreq, fieldAmp, concentration, numTimeSteps, numParticles, diameter, sigma, hDiameter, hSigma, coating, cycles)
+	gamma, boxLength, rAvg, angFreq, dt, timeSteps, volumes, hVolumes, betas, betas2, kValues, k2Values, \
+		fieldAmp = calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, fieldAmp, \
+		concentration, numTimeSteps, numParticles, diameter, sigma, hDiameter, hSigma, coating, cycles)
 	
 	#initialize empty matrix to be saved
 	magData = np.zeros((int(numTimeSteps/(cycles*cut)),2,numReps))
@@ -69,19 +85,19 @@ def simulate_MH(numParticles=100, numReps=1, diameter=25, shape="cubic", savefil
 	#loop over iterations
 	for x in range(numReps):
 		#initialize particles and fields
-		particleMoments, particleAxes, mStart, nStart, hApplied, particleCoords, ghostCoords, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2, \
-			distMatrixSq, distMatrix = initialize_all(numParticles, numTimeSteps, cluster, boxLength, hDiameter, aligned, field, fieldAmp, angFreq, \
-			timeSteps, shape, rAvg)
+		particleMoments, particleAxes, mStart, nStart, hApplied, particleCoords, ghostCoords, masks, \
+			distMatrixSq, distMatrix = initialize_all(numParticles, numTimeSteps, cluster, boxLength, \
+			hDiameter, aligned, field, fieldAmp, angFreq, timeSteps, shape, rAvg)
 
 		#thermalize without applied field
-		particleMoments, particleAxes = thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diameter, alpha, Ms, gamma, \
-			viscosity, temperature, volumes, hVolumes, kValues, k2Values, betas, betas2, shape, brownian, dt, \
-			interactions, ghostCoords, distMatrix, distMatrixSq, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2)
+		particleMoments, particleAxes = thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, \
+			diameter, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, kValues, k2Values, betas, \
+			betas2, shape, brownian, dt, interactions, ghostCoords, distMatrix, distMatrixSq, masks)
 
 		#main simulation with applied field
-		particleMoments = run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, diameter, alpha, Ms, gamma,\
-			viscosity, temperature, volumes, hVolumes, kValues, k2Values, betas, betas2, shape, brownian, dt, \
-			interactions, ghostCoords, distMatrix, distMatrixSq, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2, hApplied)
+		particleMoments = run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, diameter, \
+			alpha, Ms, gamma,viscosity, temperature, volumes, hVolumes, kValues, k2Values, betas, betas2, \
+			shape, brownian, dt, interactions, ghostCoords, distMatrix, distMatrixSq, masks, hApplied)
 
 		#fill in data matrix to save
 		magData[:,0,x] = hApplied[:int(numTimeSteps/cycles):cut]*1000   #convert field back to mT
@@ -89,7 +105,8 @@ def simulate_MH(numParticles=100, numReps=1, diameter=25, shape="cubic", savefil
 		#throws away data if NaN values. otherwise saves last cycle of points
 		if np.isnan(particleMoments).any() == True: print("Iteration " + str(x + 1) + " skipped from nan")
 		else: 
-			magData[:,1,x] = np.mean(particleMoments[:,2,:],axis=0)[int(numTimeSteps/cycles)*(cycles-1)::cut]   #average over all particles
+			#average over all particles
+			magData[:,1,x] = np.mean(particleMoments[:,2,:],axis=0)[int(numTimeSteps/cycles)*(cycles-1)::cut]   
 			print("Iteration " + str(x + 1) + " successful")
 
 	#average over all iterations
@@ -101,10 +118,7 @@ def simulate_MH(numParticles=100, numReps=1, diameter=25, shape="cubic", savefil
 	return magData
 
 def timeit(method):
-
-	"""
-	Returns time elapsed by a particular function
-	"""
+	"""Returns time elapsed by a particular function."""
 	def timed(*args, **kw):
 		ts = time.time()   #start time
 		result = method(*args, **kw)
@@ -115,11 +129,26 @@ def timeit(method):
 		return result
 	return timed
 
-def calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, fieldAmp, concentration, numTimeSteps, numParticles, diameter, \
-	sigma, hDiameter, hSigma, coating, cycles):
+def calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, fieldAmp, concentration, \
+	numTimeSteps, numParticles, diameter, sigma, hDiameter, hSigma, coating, cycles):
 
 	"""
-	Sets initial values for parameters based on inputs
+	Sets initial values for parameters based on inputs.
+
+	Returns:
+		gamma					  (float) : resonance frequency (Hz)
+		boxLength				  (float) : length of one side of the cube that particles are placed in (m)
+		rAvg 					  (float) : average separation of particles (m)
+		angFreq					  (float) : angular frequency of applied field (Rad/s)
+		dt 						  (float) : time step (s)
+		timeSteps 				  (array) : array of each time step for one field cycle
+		volumes 				  (array) : array of core volumes for corresponding particles
+		hVolumes 				  (array) : array of hydrodynamic volumes for corresponding particles
+		betas 					  (array) : array of parameter beta for anisotropy energy calculation 
+		betas2 					  (array) : array of parameter beta2 for anisotropy energy calculation
+		kValues 				  (array) : array of K1 values for corresponding particles 
+		k2Values 				  (array) : array of K2 values for corresponding particles 
+		fieldAmp				  (float) : amplitude of applied magnetic field in Tesla
 	"""
 	#---adjust units
 	diameter *= 1e-9    #convert to meters
@@ -152,12 +181,17 @@ def calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, field
 	betas = Ms**(-1)*kValues   #create array of betas
 	betas2 = Ms**(-1)*k2Values   #create array of betas from K2
 
-	return gamma, boxLength, rAvg, angFreq, dt, timeSteps, volumes, hVolumes, betas, betas2, kValues, k2Values, fieldAmp
+	return gamma, boxLength, rAvg, angFreq, dt, timeSteps, volumes, hVolumes, betas, betas2, kValues, \
+		k2Values, fieldAmp
 
 def initialize_empty_matrices(numParticles, numTimeSteps, shape):
 
 	"""
-	Creates empty matrices for particle moments and axes
+	Creates empty matrices for particle moments and axes.
+
+	Returns:
+		particleMoments 	      (array) : empty array of particle moments
+		particleAxes			  (array) : empty array of particle axes
 	"""
 	particleMoments = np.zeros((numParticles,3,numTimeSteps))   #initialize moment matrix
 	if shape == "uniaxial": particleAxes = np.zeros((numParticles,3,2))   #initialize anisotropy axes
@@ -165,11 +199,18 @@ def initialize_empty_matrices(numParticles, numTimeSteps, shape):
 
 	return particleMoments, particleAxes
 
-def initialize_particles(particleMoments, particleAxes, numParticles, numTimeSteps, cluster, boxLength, hDiameter, aligned, field, \
-	fieldAmp, angFreq, timeSteps, shape):
+def initialize_particles(particleMoments, particleAxes, numParticles, numTimeSteps, cluster, boxLength, \
+	hDiameter, aligned, field, fieldAmp, angFreq, timeSteps, shape):
 
 	"""
-	Initializes particle positions, moments, axes, and applied field
+	Initializes particle positions, moments, axes, and applied field.
+
+	Returns:
+		particleMoments 	      (array) : array of particle moments
+		particleAxes			  (array) : array of particle axes
+		mStart					  (array) : initial particle moments
+		nStart 					  (array) : initial particle axes
+		particleCoords			  (array) : particle spatial coordinates
 	"""
 
 	if cluster == 0: particleCoords = np.random.rand(numParticles,3)*boxLength   #random positions
@@ -221,11 +262,17 @@ def initialize_particles(particleMoments, particleAxes, numParticles, numTimeSte
 def initialize_ghost_coords(particleCoords, rAvg, boxLength):
 
 	"""
-	Initialize "ghost" coordinates to implement periodic boundary conditions
+	Initialize "ghost" coordinates to implement periodic boundary conditions. Copies particles within rAvg/3 
+	of the edges.
+
+	Returns:
+		ghostCoords 	 	      (array) : array of coordinates of "ghost" matrix
+		masks					   (list) : list containing 6 arrays of masks used for periodic BCs
 	"""
 
 	ghostCoords = particleCoords
 
+	#copy and extend in the x direction
 	maskX1 = ghostCoords[:,0] < rAvg/3
 	maskX2 = ghostCoords[:,0] > boxLength-rAvg/3
 
@@ -237,6 +284,7 @@ def initialize_ghost_coords(particleCoords, rAvg, boxLength):
 	ghostCoords = np.vstack((ghostCoords,x_ext1))
 	ghostCoords = np.vstack((ghostCoords,x_ext2))
 
+	#copy and extend in the y direction
 	maskY1 = ghostCoords[:,1] < rAvg/3
 	maskY2 = ghostCoords[:,1] > boxLength-rAvg/3
 
@@ -248,6 +296,7 @@ def initialize_ghost_coords(particleCoords, rAvg, boxLength):
 	ghostCoords = np.vstack((ghostCoords,y_ext1))
 	ghostCoords = np.vstack((ghostCoords,y_ext2))
 
+	#copy and extend in the z direction
 	maskZ1 = ghostCoords[:,2] < rAvg/3
 	maskZ2 = ghostCoords[:,2] > boxLength-rAvg/3
 
@@ -259,46 +308,61 @@ def initialize_ghost_coords(particleCoords, rAvg, boxLength):
 	ghostCoords = np.vstack((ghostCoords,z_ext1))
 	ghostCoords = np.vstack((ghostCoords,z_ext2))
 
-	return ghostCoords, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2
+	#preserve and combine masks
+	masks = [maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2]
+
+	return ghostCoords, masks
 
 @timeit
 def initialize_all(numParticles, numTimeSteps, cluster, boxLength, hDiameter, aligned, field, \
 	fieldAmp, angFreq, timeSteps, shape, rAvg):
-
+	"""Initializes all particles and fields."""
+	#create empty matrices
 	particleMoments, particleAxes = initialize_empty_matrices(numParticles, numTimeSteps, shape)
 
-	particleMoments, particleAxes, mStart, nStart, hApplied, particleCoords = initialize_particles(particleMoments, particleAxes, \
-		numParticles, numTimeSteps, cluster, boxLength, hDiameter, aligned, field, fieldAmp, angFreq, timeSteps, shape)
+	#fill matrices, initialize particles and fields
+	particleMoments, particleAxes, mStart, nStart, hApplied, particleCoords = initialize_particles(particleMoments, \
+		particleAxes, numParticles, numTimeSteps, cluster, boxLength, hDiameter, aligned, field, fieldAmp, angFreq, \
+		timeSteps, shape)
 	
-	ghostCoords, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2 = initialize_ghost_coords(particleCoords, rAvg, boxLength)
+	#initialize "ghost" coordinates for periodic boundary conditions
+	ghostCoords, masks = initialize_ghost_coords(particleCoords, rAvg, boxLength)
 	distMatrixSq = repmat(ghostCoords, len(ghostCoords), 1) - repeat(ghostCoords, len(ghostCoords), axis=0)
 	distMatrixSq = distMatrixSq.reshape((len(ghostCoords), len(ghostCoords), 3))
 	distMatrix = np.sqrt(np.sum(distMatrixSq**2, axis = 2))
 
-	return particleMoments, particleAxes, mStart, nStart, hApplied, particleCoords, ghostCoords, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2, distMatrixSq, distMatrix
+	return particleMoments, particleAxes, mStart, nStart, hApplied, particleCoords, ghostCoords, masks, \
+		distMatrixSq, distMatrix
 
-def make_ghost_matrix(M, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2):
+def make_ghost_matrix(M, masks):
 
 	"""
-	Initialize "ghost" matrix to implement periodic boundary conditions
+	Initialize "ghost" matrix to implement periodic boundary conditions.
+
+	Returns:
+		ghostMatrix					  (array) : array of "ghost" particle moments for periodic BCs
 	"""
 
+	#initialize ghost matrix
 	ghostMatrix = M
 
-	mX1 = np.copy(ghostMatrix[maskX1])
-	mX2 = np.copy(ghostMatrix[maskX2])
+	#copy moments in x direction
+	mX1 = np.copy(ghostMatrix[masks[0]])
+	mX2 = np.copy(ghostMatrix[masks[1]])
 
 	ghostMatrix = np.vstack((ghostMatrix,mX1))
 	ghostMatrix = np.vstack((ghostMatrix,mX2))
 
-	mY1 = np.copy(ghostMatrix[maskY1])
-	mY2 = np.copy(ghostMatrix[maskY2])
+	#copy moments in y direction
+	mY1 = np.copy(ghostMatrix[masks[2]])
+	mY2 = np.copy(ghostMatrix[masks[3]])
 
 	ghostMatrix = np.vstack((ghostMatrix,mY1))
 	ghostMatrix = np.vstack((ghostMatrix,mY2))
 
-	mZ1 = np.copy(ghostMatrix[maskZ1])
-	mZ2 = np.copy(ghostMatrix[maskZ2])
+	#copy moments in z direction
+	mZ1 = np.copy(ghostMatrix[masks[4]])
+	mZ2 = np.copy(ghostMatrix[masks[5]])
 
 	ghostMatrix = np.vstack((ghostMatrix,mZ1))
 	ghostMatrix = np.vstack((ghostMatrix,mZ2))
@@ -307,17 +371,35 @@ def make_ghost_matrix(M, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2):
 
 def generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, dt, type):
 
+	"""
+	Generates vector of random thermal fluctuations. Specify field or torque with "type".
+
+	Returns:
+		dW					  (array) : array of fluctuations
+	"""
+	#set standard deviation for fluctuations based on type		
 	if type == "H": sd = np.sqrt(dt*2*(1+alpha**2)*kb*(gamma*Ms*alpha)**(-1)*temperature*volumes[:,None]**(-1))
 	if type == "T": sd = np.sqrt(dt*12*kb*temperature*viscosity*hVolumes[:,None])
+	#generate randomly distributed fluctuations
 	dW = np.random.normal(loc = 0.0, scale = sd, size = (numParticles,3))
 
 	return dW
 
 def calculate_cosines(M, A):
-		mx = np.sum(M*A[:,3:6],axis=1)[:,None]
-		my = np.sum(M*A[:,6:],axis=1)[:,None]
-		mz = np.sum(M*A[:,:3],axis=1)[:,None]
-		return mx, my, mz
+
+	"""
+	Calculate direction cosines (dot product of moment and axis vectors).
+
+	Returns:
+		mx					  (array) : direction cosines for x 
+		my					  (array) : direction cosines for y 
+		mz					  (array) : direction cosines for z 
+	"""
+	mx = np.sum(M*A[:,3:6],axis=1)[:,None]
+	my = np.sum(M*A[:,6:],axis=1)[:,None]
+	mz = np.sum(M*A[:,:3],axis=1)[:,None]
+
+	return mx, my, mz
 
 def calculate_torque(M, A, kValues, volumes, shape, *args):
 	if shape == "uniaxial": torque = -2*(kValues*volumes)[:,None]*np.absolute(np.sum(M*A,axis=1))[:,None]*np.cross(A,M)
@@ -352,9 +434,12 @@ def calculate_field(M, A, betas, shape, *args):
 
 	return field
 
-def calculate_interaction_field(M, ghostCoords, RR, R, numParticles, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2, diameter, Ms):
-	ghostMatrix = make_ghost_matrix(M, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2)
-	mask = np.tile(reduce(np.logical_or, [R == 0]),3)
+def calculate_interaction_field(M, ghostCoords, RR, R, numParticles, masks, diameter, Ms):
+	ghostMatrix = make_ghost_matrix(M, masks)
+	mask = np.zeros((len(ghostCoords),len(ghostCoords),3))
+	mask[:,:,0] = reduce(np.logical_or, [R == 0])
+	mask[:,:,1] = reduce(np.logical_or, [R == 0])
+	mask[:,:,2] = reduce(np.logical_or, [R == 0])
 	Mask = ma.masked_array((mu0*diameter**3/8.*Ms*(3*np.sum(RR*ghostMatrix,axis=2)[:,:,None]*RR/R[:,:,None]**2 - ghostMatrix))/R[:,:,None]**3, mask=mask, fill_value = 0)
 	dipoleField = np.sum(Mask.filled(0)[0:numParticles,:,:],axis=1)
 	return dipoleField
@@ -374,7 +459,8 @@ def rotate_axes(A, numParticles):
 	return A
 
 @timeit
-def thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diameter, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, kValues, k2Values, betas, betas2, shape, brownian, dt, interactions, ghostCoords, distMatrix, distMatrixSq, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2):
+def thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diameter, alpha, Ms, gamma, viscosity, temperature, volumes, \
+	hVolumes, kValues, k2Values, betas, betas2, shape, brownian, dt, interactions, ghostCoords, distMatrix, distMatrixSq, masks):
 	for n in range(int(numTimeSteps/3)):
 		dW = generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, dt, "H")
 
@@ -389,7 +475,7 @@ def thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diamet
 		if shape == "cubic": field = calculate_field(particleMoments[:,:,n], particleAxes[:,:,0], betas, shape, mx, my, mz, betas2)
 
 		if interactions == "on":
-			dipoleField = calculate_interaction_field(particleMoments[:,:,n], ghostCoords, distMatrixSq, distMatrix, numParticles, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2, diameter, Ms)
+			dipoleField = calculate_interaction_field(particleMoments[:,:,n], ghostCoords, distMatrixSq, distMatrix, numParticles, masks, diameter, Ms)
 			field += dipoleField
 		
 		mBar = particleMoments[:,:,n] + gamma*(1+alpha**2)**(-1)*((np.cross(particleMoments[:,:,n],field) \
@@ -421,7 +507,7 @@ def thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diamet
 		if shape == "cubic": hBar = calculate_field(mBar, nBar, betas, shape, mxBar, myBar, mzBar, betas2)
 
 		if interactions == "on":
-			dipoleFieldBar = calculate_interaction_field(mBar, ghostCoords, distMatrixSq, distMatrix, numParticles, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2, diameter, Ms)
+			dipoleFieldBar = calculate_interaction_field(mBar, ghostCoords, distMatrixSq, distMatrix, numParticles, masks, diameter, Ms)
 			hBar += dipoleFieldBar
 
 		particleMoments[:,:,n+1] = particleMoments[:,:,n] + gamma*(1+alpha**2)**(-1)*(0.5*(dt*(np.cross(particleMoments[:,:,n],field) - alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],field)) + np.cross(mBar,hBar) - alpha*np.cross(mBar, np.cross(mBar,hBar))) + np.cross(particleMoments[:,:,n],dW) - alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],dW)) + np.cross(mBar,dW) - alpha*np.cross(mBar, np.cross(mBar,dW))))
@@ -442,7 +528,8 @@ def thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diamet
 	return particleMoments, particleAxes
 
 @timeit
-def run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, diameter, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, kValues, k2Values, betas, betas2, shape, brownian, dt, interactions, ghostCoords, distMatrix, distMatrixSq, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2, hApplied):
+def run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, diameter, alpha, Ms, gamma, viscosity, temperature, volumes, \
+	hVolumes, kValues, k2Values, betas, betas2, shape, brownian, dt, interactions, ghostCoords, distMatrix, distMatrixSq, masks, hApplied):
 	for n in range(numTimeSteps-1):
 		dW = generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, dt, "H")
 
@@ -459,7 +546,7 @@ def run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, di
 		field[:,2] += hApplied[n]
 
 		if interactions == "on":
-			dipoleField = calculate_interaction_field(particleMoments[:,:,n], ghostCoords, distMatrixSq, distMatrix, numParticles, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2, diameter, Ms)
+			dipoleField = calculate_interaction_field(particleMoments[:,:,n], ghostCoords, distMatrixSq, distMatrix, numParticles, masks, diameter, Ms)
 			field += dipoleField
 		
 		mBar = particleMoments[:,:,n] + gamma*(1+alpha**2)**(-1)*((np.cross(particleMoments[:,:,n],field) \
@@ -493,7 +580,7 @@ def run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, di
 		hBar[:,2] += hApplied[n+1]
 
 		if interactions == "on":
-			dipoleFieldBar = calculate_interaction_field(mBar, ghostCoords, distMatrixSq, distMatrix, numParticles, maskX1, maskX2, maskY1, maskY2, maskZ1, maskZ2, diameter, Ms)
+			dipoleFieldBar = calculate_interaction_field(mBar, ghostCoords, distMatrixSq, distMatrix, numParticles, masks, diameter, Ms)
 			hBar += dipoleFieldBar
 
 		particleMoments[:,:,n+1] = particleMoments[:,:,n] + gamma*(1+alpha**2)**(-1)*(0.5*(dt*(np.cross(particleMoments[:,:,n],field) - alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],field)) + np.cross(mBar,hBar) - alpha*np.cross(mBar, np.cross(mBar,hBar))) + np.cross(particleMoments[:,:,n],dW) - alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],dW)) + np.cross(mBar,dW) - alpha*np.cross(mBar, np.cross(mBar,dW))))
@@ -507,7 +594,7 @@ def run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, di
 	return particleMoments
 
 
-simulate_MH(numParticles=10, numReps=5, numTimeSteps=1000, shape = "uniaxial", K=5000, savefile="test")
+simulate_MH(numParticles=10, numReps=1, numTimeSteps=10, shape = "cubic", interactions="on")
 
 
 
