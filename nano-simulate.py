@@ -23,7 +23,6 @@ def simulate_MH(numParticles=100, numReps=1, diameter=25, shape="cubic", savefil
 	fieldAmp=20, fieldFreq=25, cycles=2, sigma=0.1, hDiameter=50, coating=None, hSigma=0.1, kBulk=-13000, \
 	kSurface=-3.9e-5, K=None, K2=-5000, kSigma=0.2, alpha=1, Ms=420000, viscosity=8.9e-4, time="off", \
 	field="ac",cut=10):
-
 	"""
 	Main function to simulate M(H) curve.
 
@@ -131,7 +130,6 @@ def timeit(method):
 
 def calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, fieldAmp, concentration, \
 	numTimeSteps, numParticles, diameter, sigma, hDiameter, hSigma, coating, cycles):
-
 	"""
 	Sets initial values for parameters based on inputs.
 
@@ -150,7 +148,7 @@ def calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, field
 		k2Values 				  (array) : array of K2 values for corresponding particles 
 		fieldAmp				  (float) : amplitude of applied magnetic field in Tesla
 	"""
-	#---adjust units
+	#adjust units
 	diameter *= 1e-9    #convert to meters
 	hDiameter *= 1e-9   #convert to meters
 	fieldFreq *= 1000 	#convert to Hz
@@ -185,7 +183,6 @@ def calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, field
 		k2Values, fieldAmp
 
 def initialize_empty_matrices(numParticles, numTimeSteps, shape):
-
 	"""
 	Creates empty matrices for particle moments and axes.
 
@@ -201,7 +198,6 @@ def initialize_empty_matrices(numParticles, numTimeSteps, shape):
 
 def initialize_particles(particleMoments, particleAxes, numParticles, numTimeSteps, cluster, boxLength, \
 	hDiameter, aligned, field, fieldAmp, angFreq, timeSteps, shape):
-
 	"""
 	Initializes particle positions, moments, axes, and applied field.
 
@@ -212,7 +208,6 @@ def initialize_particles(particleMoments, particleAxes, numParticles, numTimeSte
 		nStart 					  (array) : initial particle axes
 		particleCoords			  (array) : particle spatial coordinates
 	"""
-
 	if cluster == 0: particleCoords = np.random.rand(numParticles,3)*boxLength   #random positions
 	if cluster == 1:   #chain
 		cTheta = np.random.rand(1)*np.pi/2.   #generate random angle for chain orientation
@@ -260,7 +255,6 @@ def initialize_particles(particleMoments, particleAxes, numParticles, numTimeSte
 	return particleMoments, particleAxes, mStart, nStart, hApplied, particleCoords
 
 def initialize_ghost_coords(particleCoords, rAvg, boxLength):
-
 	"""
 	Initialize "ghost" coordinates to implement periodic boundary conditions. Copies particles within rAvg/3 
 	of the edges.
@@ -269,7 +263,6 @@ def initialize_ghost_coords(particleCoords, rAvg, boxLength):
 		ghostCoords 	 	      (array) : array of coordinates of "ghost" matrix
 		masks					   (list) : list containing 6 arrays of masks used for periodic BCs
 	"""
-
 	ghostCoords = particleCoords
 
 	#copy and extend in the x direction
@@ -335,14 +328,12 @@ def initialize_all(numParticles, numTimeSteps, cluster, boxLength, hDiameter, al
 		distMatrixSq, distMatrix
 
 def make_ghost_matrix(M, masks):
-
 	"""
 	Initialize "ghost" matrix to implement periodic boundary conditions.
 
 	Returns:
 		ghostMatrix					  (array) : array of "ghost" particle moments for periodic BCs
 	"""
-
 	#initialize ghost matrix
 	ghostMatrix = M
 
@@ -370,7 +361,6 @@ def make_ghost_matrix(M, masks):
 	return ghostMatrix
 
 def generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, dt, type):
-
 	"""
 	Generates vector of random thermal fluctuations. Specify field or torque with "type".
 
@@ -386,7 +376,6 @@ def generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature
 	return dW
 
 def calculate_cosines(M, A):
-
 	"""
 	Calculate direction cosines (dot product of moment and axis vectors).
 
@@ -402,6 +391,12 @@ def calculate_cosines(M, A):
 	return mx, my, mz
 
 def calculate_torque(M, A, kValues, volumes, shape, *args):
+	"""
+	Calculate torque on each particle. Add args for cubic anisotropy: mx, my, mz, k2values
+
+	Returns:
+		torque					  (array) : array of torques
+	"""
 	if shape == "uniaxial": torque = -2*(kValues*volumes)[:,None]*np.absolute(np.sum(M*A,axis=1))[:,None]*np.cross(A,M)
 	if shape == "cubic": 
 		mx = args[0]
@@ -421,6 +416,12 @@ def calculate_torque(M, A, kValues, volumes, shape, *args):
 	return torque
 
 def calculate_field(M, A, betas, shape, *args):
+	"""
+	Calculate field on each particle. Add args for cubic anisotropy: mx, my, mz, betas2
+
+	Returns:
+		field					  (array) : array of fields
+	"""
 	if shape == "uniaxial": field = 2*betas[:,None]*np.sum(M*A,axis=1)[:,None]*A
 	if shape == "cubic": 
 		mx = args[0]
@@ -430,28 +431,45 @@ def calculate_field(M, A, betas, shape, *args):
 		nx = A[:,3:6]
 		ny = A[:,6:]
 		betas2 = args[3]
-		field = -betas[:,None]*(mx**2*mz*nz + my**2*mz*nz + mx**2*my*ny + mz**2*my*ny + my**2*mx*nx + mz**2*mx*nx) - 2*betas2[:,None]*(mx**2*my**2*mz*nz + mx**2*mz**2*my*ny + my**2*mz**2*mx*nx)
+		field = -betas[:,None]*(mx**2*mz*nz + my**2*mz*nz + mx**2*my*ny + mz**2*my*ny + my**2*mx*nx + \
+			mz**2*mx*nx) - 2*betas2[:,None]*(mx**2*my**2*mz*nz + mx**2*mz**2*my*ny + my**2*mz**2*mx*nx)
 
 	return field
 
 def calculate_interaction_field(M, ghostCoords, RR, R, numParticles, masks, diameter, Ms):
+	"""
+	Calculate dipole interaction field on each particle.
+
+	Returns:
+		dipleField					  (array) : array of dipole fields
+	"""
+	#generate "ghost" matrix for periodic BCs
 	ghostMatrix = make_ghost_matrix(M, masks)
+
+	#mask out zero values along diagonal
 	mask = np.zeros((len(ghostCoords),len(ghostCoords),3))
 	mask[:,:,0] = reduce(np.logical_or, [R == 0])
 	mask[:,:,1] = reduce(np.logical_or, [R == 0])
 	mask[:,:,2] = reduce(np.logical_or, [R == 0])
+
+	#calculate interactions between each particle
 	Mask = ma.masked_array((mu0*diameter**3/8.*Ms*(3*np.sum(RR*ghostMatrix,axis=2)[:,:,None]*RR/R[:,:,None]**2 - ghostMatrix))/R[:,:,None]**3, mask=mask, fill_value = 0)
+	
+	#sum over interactions on each particle
 	dipoleField = np.sum(Mask.filled(0)[0:numParticles,:,:],axis=1)
+
 	return dipoleField
 
 def rotate_axes(A, numParticles):
-	
+	"""Rotate two minor axes of cubic particle"""
+	#generate normal unit vector to rotate around
 	U = np.cross(A[:,:3,0],A[:,:3,1],axis=1)
 	U /= np.sqrt(U[:,0]**2 + U[:,1]**2 + U[:,2]**2)[:,None]
+	#generate angle to rotate around
 	angle = np.arccos(np.sum(A[:,:3,0]*A[:,:3,1],axis=1))
+	#create rotation matrix based on normal vector and angle
 	rotMatrix = np.array([[np.cos(angle) + (U[:,0]**2)*(1 - np.cos(angle)), U[:,0]*U[:,1]*(1 - np.cos(angle)) - U[:,2]*np.sin(angle), U[:,0]*U[:,2]*(1 - np.cos(angle)) + U[:,1]*np.sin(angle)],[U[:,0]*U[:,1]*(1 - np.cos(angle)) + U[:,2]*np.sin(angle), np.cos(angle) + (U[:,1]**2)*(1 - np.cos(angle)), U[:,2]*U[:,1]*(1 - np.cos(angle)) - U[:,0]*np.sin(angle)],[U[:,0]*U[:,2]*(1 - np.cos(angle)) - U[:,1]*np.sin(angle),U[:,2]*U[:,1]*(1 - np.cos(angle)) + U[:,0]*np.sin(angle), np.cos(angle) + (U[:,2]**2)*(1 - np.cos(angle))]])
-	nx2 = np.zeros((numParticles,3))
-	ny2 = np.zeros((numParticles,3))
+	#rotate each vector
 	for p in range(3):
 		A[:,3+p,1] = rotMatrix[p,0,:]*A[:,3,0] + rotMatrix[p,1,:]*A[:,4,0] + rotMatrix[p,2,:]*A[:,5,0]
 		A[:,6+p,1] = rotMatrix[p,0,:]*A[:,6,0] + rotMatrix[p,1,:]*A[:,7,0] + rotMatrix[p,2,:]*A[:,8,0]
@@ -459,65 +477,104 @@ def rotate_axes(A, numParticles):
 	return A
 
 @timeit
-def thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diameter, alpha, Ms, gamma, viscosity, temperature, volumes, \
-	hVolumes, kValues, k2Values, betas, betas2, shape, brownian, dt, interactions, ghostCoords, distMatrix, distMatrixSq, masks):
+def thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diameter, alpha, Ms, gamma, viscosity, \
+	temperature, volumes, hVolumes, kValues, k2Values, betas, betas2, shape, brownian, dt, interactions, \
+	ghostCoords, distMatrix, distMatrixSq, masks):
+	"""Runs simulation without applied field"""
+	#main loop over time steps
 	for n in range(int(numTimeSteps/3)):
-		dW = generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, dt, "H")
-
+		#generate thermal fluctuations for field
+		dW = generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, \
+			dt, "H")
+		#calculate direction cosines for cubic anisotropy
 		if shape == "cubic": mx, my, mz = calculate_cosines(particleMoments[:,:,n], particleAxes[:,:,0])
 
 		if brownian == "on": 
-			dT = generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, dt, "T")
-			if shape == "uniaxial": torque = calculate_torque(particleMoments[:,:,n], particleAxes[:,:,0], kValues, volumes, shape)
-			if shape == "cubic": torque = calculate_torque(particleMoments[:,:,n], particleAxes[:,:,0], kValues, volumes, shape, mx, my, mz, k2Values)		
+			#generate thermal fluctuations for torque
+			dT = generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, \
+				dt, "T")
+			#calculate torque on particles
+			if shape == "uniaxial": torque = calculate_torque(particleMoments[:,:,n], particleAxes[:,:,0], \
+				kValues, volumes, shape)
+			if shape == "cubic": torque = calculate_torque(particleMoments[:,:,n], particleAxes[:,:,0], kValues, \
+				volumes, shape, mx, my, mz, k2Values)		
 
-		if shape == "uniaxial": field = calculate_field(particleMoments[:,:,n], particleAxes[:,:,0], betas, shape)
-		if shape == "cubic": field = calculate_field(particleMoments[:,:,n], particleAxes[:,:,0], betas, shape, mx, my, mz, betas2)
+		#calculate field on particles
+		if shape == "uniaxial": field = calculate_field(particleMoments[:,:,n], particleAxes[:,:,0], betas, \
+			shape)
+		if shape == "cubic": field = calculate_field(particleMoments[:,:,n], particleAxes[:,:,0], betas, shape, \
+			mx, my, mz, betas2)
 
 		if interactions == "on":
-			dipoleField = calculate_interaction_field(particleMoments[:,:,n], ghostCoords, distMatrixSq, distMatrix, numParticles, masks, diameter, Ms)
+			#calculate dipole interaction field
+			dipoleField = calculate_interaction_field(particleMoments[:,:,n], ghostCoords, distMatrixSq, \
+				distMatrix, numParticles, masks, diameter, Ms)
+			#add to total field
 			field += dipoleField
 		
+		#calculate moment predictor
 		mBar = particleMoments[:,:,n] + gamma*(1+alpha**2)**(-1)*((np.cross(particleMoments[:,:,n],field) \
-			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],field)))*dt + np.cross(particleMoments[:,:,n],dW) \
+			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],field)))*dt + \
+			np.cross(particleMoments[:,:,n],dW) \
 			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],dW)))
+		#normalize moment predictor
 		mBar /= np.sqrt(np.einsum('...i,...i', mBar, mBar))[:,None]
 
 		if brownian == "on":
-			nBar = particleAxes[:,:3,0] + (6*viscosity*hVolumes[:,None])**(-1)*(np.cross(torque,particleAxes[:,:3,0])*dt + np.cross(dT,particleAxes[:,:3,0]))
+			#calculate axis predictor
+			nBar = particleAxes[:,:3,0] + (6*viscosity*hVolumes[:,None])**(-1)*(np.cross(torque,particleAxes[:,:3,0])*dt \
+				+ np.cross(dT,particleAxes[:,:3,0]))
+			#normalize axis predictor
 			nBar /= np.sqrt(np.einsum('...i,...i', nBar, nBar))[:,None]
 
+			#calculate torque predictor(s)
 			if shape == "uniaxial": tBar = calculate_torque(mBar, nBar, kValues, volumes, shape)
-				
 			if shape == "cubic":
-				nxBar = particleAxes[:,3:6,0] + (6*viscosity*hVolumes[:,None])**(-1)*(np.cross(torque,particleAxes[:,3:6,0])*dt + np.cross(dT,particleAxes[:,3:6,0]))
-				nyBar = particleAxes[:,6:,0] + (6*viscosity*hVolumes[:,None])**(-1)*(np.cross(torque,particleAxes[:,6:,0])*dt + np.cross(dT,particleAxes[:,6:,0]))
+				nxBar = particleAxes[:,3:6,0] + (6*viscosity*hVolumes[:,None])**(-1)*(np.cross(torque,particleAxes[:,3:6,0])*dt \
+					+ np.cross(dT,particleAxes[:,3:6,0]))
+				nyBar = particleAxes[:,6:,0] + (6*viscosity*hVolumes[:,None])**(-1)*(np.cross(torque,particleAxes[:,6:,0])*dt \
+					+ np.cross(dT,particleAxes[:,6:,0]))
 				nBar = np.concatenate((nBar, nxBar, nyBar), axis=1)
 				mxBar, myBar, mzBar = calculate_cosines(mBar, nBar)
 				tBar = calculate_torque(mBar, nBar, kValues, volumes, shape, mxBar, myBar, mzBar, k2Values)
 
-			particleAxes[:,:3,1] = particleAxes[:,:3,0] + (6*viscosity*hVolumes[:,None])**(-1)*0.5*(dt*(np.cross(torque,particleAxes[:,:3,0]) + np.cross(tBar,nBar[:,:3])) + np.cross(dT,particleAxes[:,:3,0]) + np.cross(dT,nBar[:,:3]))
+			#calculate new particle axes
+			particleAxes[:,:3,1] = particleAxes[:,:3,0] + (6*viscosity*hVolumes[:,None])**(-1)*0.5*(dt*(np.cross(torque,particleAxes[:,:3,0]) \
+				+ np.cross(tBar,nBar[:,:3])) + np.cross(dT,particleAxes[:,:3,0]) + np.cross(dT,nBar[:,:3]))
+			#normalize new particle axes
 			particleAxes[:,:3,1] /= np.sqrt(np.einsum('...i,...i', particleAxes[:,:3,1], particleAxes[:,:3,1]))[:,None]
 
 		else: 
+			#set axis predictors equal
 			nBar, particleAxes[:,:,1] = particleAxes[:,:,0] 
 			if shape == "cubic": mxBar, myBar, mzBar = calculate_cosines(mBar, nBar)
 
+		#calculate field predictors
 		if shape == "uniaxial": hBar = calculate_field(mBar, nBar, betas, shape)
 		if shape == "cubic": hBar = calculate_field(mBar, nBar, betas, shape, mxBar, myBar, mzBar, betas2)
 
 		if interactions == "on":
-			dipoleFieldBar = calculate_interaction_field(mBar, ghostCoords, distMatrixSq, distMatrix, numParticles, masks, diameter, Ms)
+			dipoleFieldBar = calculate_interaction_field(mBar, ghostCoords, distMatrixSq, distMatrix, \
+				numParticles, masks, diameter, Ms)
 			hBar += dipoleFieldBar
 
-		particleMoments[:,:,n+1] = particleMoments[:,:,n] + gamma*(1+alpha**2)**(-1)*(0.5*(dt*(np.cross(particleMoments[:,:,n],field) - alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],field)) + np.cross(mBar,hBar) - alpha*np.cross(mBar, np.cross(mBar,hBar))) + np.cross(particleMoments[:,:,n],dW) - alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],dW)) + np.cross(mBar,dW) - alpha*np.cross(mBar, np.cross(mBar,dW))))
+		#calculate new particle moments
+		particleMoments[:,:,n+1] = particleMoments[:,:,n] + gamma*(1+alpha**2)**(-1)*(0.5*(dt*(np.cross(particleMoments[:,:,n],field) \
+			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],field)) + np.cross(mBar,hBar) \
+			- alpha*np.cross(mBar, np.cross(mBar,hBar))) + np.cross(particleMoments[:,:,n],dW) \
+			- alpha*np.cross(particleMoments[:,:,n], np.cross(particleMoments[:,:,n],dW)) + np.cross(mBar,dW) \
+			- alpha*np.cross(mBar, np.cross(mBar,dW))))
+		#normalize new particle moments
 		particleMoments[:,:,n+1] /= np.sqrt(np.einsum('...i,...i', particleMoments[:,:,n+1], particleMoments[:,:,n+1]))[:,None]
 
 		if shape == "cubic" and brownian == "on":
+			#rotate minor axes
 			particleAxes = rotate_axes(particleAxes, numParticles)
 
+		#copy new particle axes
 		particleAxes[:,:,0] = particleAxes[:,:,1]
 
+		#save configuration
 		if n == int(numTimeSteps/5): 
 			copyM = np.copy(particleMoments[:,:,n+1])
 			copyA = np.copy(particleAxes[:,:3,0])
@@ -528,8 +585,10 @@ def thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diamet
 	return particleMoments, particleAxes
 
 @timeit
-def run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, diameter, alpha, Ms, gamma, viscosity, temperature, volumes, \
-	hVolumes, kValues, k2Values, betas, betas2, shape, brownian, dt, interactions, ghostCoords, distMatrix, distMatrixSq, masks, hApplied):
+def run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, diameter, alpha, Ms, gamma, \
+	viscosity, temperature, volumes, hVolumes, kValues, k2Values, betas, betas2, shape, brownian, dt, \
+	interactions, ghostCoords, distMatrix, distMatrixSq, masks, hApplied):
+	"""Run simulation with applied field."""
 	for n in range(numTimeSteps-1):
 		dW = generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, dt, "H")
 
