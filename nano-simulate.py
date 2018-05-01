@@ -550,7 +550,8 @@ def thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diamet
 
 		else: 
 			#set axis predictors equal
-			nBar, particleAxes[:,:,1] = particleAxes[:,:,0] 
+			nBar = particleAxes[:,:,0]
+			particleAxes[:,:,1] = particleAxes[:,:,0] 
 			if shape == "cubic": mxBar, myBar, mzBar = calculate_cosines(mBar, nBar)
 
 		#calculate field predictors
@@ -661,7 +662,8 @@ def run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, di
 
 		else: 
 			#set axis predictors equal
-			nBar, particleAxes[:,:,1] = particleAxes[:,:,0] 
+			nBar = particleAxes[:,:,0]
+			particleAxes[:,:,1] = particleAxes[:,:,0] 
 			if shape == "cubic": mxBar, myBar, mzBar = calculate_cosines(mBar, nBar)
 
 		#calculate field predictors
@@ -695,7 +697,7 @@ def run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, di
 	return particleMoments
 
 
-simulate_MH(numParticles=10, numReps=1, numTimeSteps=10, shape = "cubic", interactions="on")
+simulate_MH(numParticles=10, numReps=1, numTimeSteps=10, shape = "cubic", interactions="off")
 
 
 
