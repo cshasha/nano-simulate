@@ -152,7 +152,7 @@ def calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, field
 	diameter *= 1e-9    #convert to meters
 	hDiameter *= 1e-9   #convert to meters
 	fieldFreq *= 1000 	#convert to Hz
- 	fieldAmp *= 0.001    #convert to Tesla
+ 	fieldAmp *= 0.001   #convert to Tesla
 
  	if coating != None: hDiameter = diameter + coating*1e-9   #hydrodynamic diameter
 	if shape == "cubic": K = kBulk + 6*kSurface/diameter   #calculate effective K from Bulk and Surface
