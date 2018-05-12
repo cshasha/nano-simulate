@@ -75,12 +75,13 @@ def simulate_MH(numParticles=100, numReps=1, diameter=25, shape="cubic", savefil
 	"""
 	#set initial values
 	gamma, boxLength, rAvg, angFreq, dt, timeSteps, volumes, hVolumes, betas, betas2, kValues, k2Values, \
-		fieldAmp = calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, fieldAmp, \
+		fieldAmp, numTimeSteps = calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, fieldAmp, \
 		concentration, numTimeSteps, numParticles, diameter, sigma, hDiameter, hSigma, coating, cycles)
 	
 	#initialize empty matrix to be saved
 	magData = np.zeros((int(numTimeSteps/(cycles*cut)),2,numReps))
 
+	print(numTimeSteps)
 	#loop over iterations
 	for x in range(numReps):
 		#initialize particles and fields
@@ -101,11 +102,12 @@ def simulate_MH(numParticles=100, numReps=1, diameter=25, shape="cubic", savefil
 		#fill in data matrix to save
 		magData[:,0,x] = hApplied[:int(numTimeSteps/cycles):cut]*1000   #convert field back to mT
 
+
 		#throws away data if NaN values. otherwise saves last cycle of points
 		if np.isnan(particleMoments).any() == True: print("Iteration " + str(x + 1) + " skipped from nan")
 		else: 
 			#average over all particles
-			magData[:,1,x] = np.mean(particleMoments[:,2,:],axis=0)[int(numTimeSteps/cycles)*(cycles-1)::cut]   
+			magData[:,1,x] = np.mean(particleMoments[:,2,:],axis=0)[int(numTimeSteps/cycles)*(cycles-1)::cut] 
 			print("Iteration " + str(x + 1) + " successful")
 
 	#average over all iterations
@@ -153,11 +155,12 @@ def calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, field
 	hDiameter *= 1e-9   #convert to meters
 	fieldFreq *= 1000 	#convert to Hz
  	fieldAmp *= 0.001   #convert to Tesla
+ 	numTimeSteps *= cycles
 
  	if coating != None: hDiameter = diameter + coating*1e-9   #hydrodynamic diameter
 	if shape == "cubic": K = kBulk + 6*kSurface/diameter   #calculate effective K from Bulk and Surface
-
-	H_k = 2*np.abs(K)/float(Ms)   #anisotropy field
+	
+	H_k = 50*np.abs(K)/float(Ms)   #anisotropy field
 	gamma = gyro*H_k/(2*np.pi)   #resonance frequency
 
 	boxLength = (numParticles*concentration**(-1))**(1/3.)   #length of one box side
@@ -180,7 +183,7 @@ def calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, field
 	betas2 = Ms**(-1)*k2Values   #create array of betas from K2
 
 	return gamma, boxLength, rAvg, angFreq, dt, timeSteps, volumes, hVolumes, betas, betas2, kValues, \
-		k2Values, fieldAmp
+		k2Values, fieldAmp, numTimeSteps
 
 def initialize_empty_matrices(numParticles, numTimeSteps, shape):
 	"""
@@ -486,7 +489,7 @@ def thermalize(numTimeSteps, numParticles, particleMoments, particleAxes, diamet
 	ghostCoords, distMatrix, distMatrixSq, masks):
 	"""Runs simulation without applied field"""
 	#main loop over time steps
-	for n in range(int(numTimeSteps/3)):
+	for n in range(int(numTimeSteps/3.)):
 		#generate thermal fluctuations for field
 		dW = generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, \
 			dt, "H")
@@ -697,7 +700,9 @@ def run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, di
 	return particleMoments
 
 
-simulate_MH(numParticles=10, numReps=1, numTimeSteps=10, shape = "cubic", interactions="off")
+magData = simulate_MH(numParticles=1000, numReps=1, numTimeSteps=1000, shape = "uniaxial",K = 6000,brownian="on",interactions="off", coating=20, cut=1)
+#pl.plot(magData[:,0], magData[:,1])
+#pl.show()
 
 
 
