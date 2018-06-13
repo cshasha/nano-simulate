@@ -41,7 +41,7 @@ def calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, field
  	if coating != None: hDiameter = diameter + coating*1e-9   #hydrodynamic diameter
 	if shape == "cubic": K = kBulk + 6*kSurface/diameter   #calculate effective K from Bulk and Surface
 	
-	H_k = 50*np.abs(K)/float(Ms)   #anisotropy field
+	H_k = 2*np.abs(K)/float(Ms)   #anisotropy field
 	gamma = gyro*H_k/(2*np.pi)   #resonance frequency
 
 	boxLength = (numParticles*concentration**(-1))**(1/3.)   #length of one box side
