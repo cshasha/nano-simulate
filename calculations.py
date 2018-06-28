@@ -4,6 +4,7 @@ import numpy.ma as ma
 import itertools
 from functools import reduce
 from numpy.matlib import repmat, repeat
+from initialize import *
 
 #---global constants----
 kb = 1.381e-23   #boltzmann constant
@@ -41,7 +42,7 @@ def calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, field
  	if coating != None: hDiameter = diameter + coating*1e-9   #hydrodynamic diameter
 	if shape == "cubic": K = kBulk + 6*kSurface/diameter   #calculate effective K from Bulk and Surface
 	
-	H_k = 2*np.abs(K)/float(Ms)   #anisotropy field
+	H_k = 40*np.abs(K)/float(Ms)   #anisotropy field
 	gamma = gyro*H_k/(2*np.pi)   #resonance frequency
 
 	boxLength = (numParticles*concentration**(-1))**(1/3.)   #length of one box side
@@ -64,7 +65,7 @@ def calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, field
 	betas2 = Ms**(-1)*k2Values   #create array of betas from K2
 
 	return gamma, boxLength, rAvg, angFreq, dt, timeSteps, volumes, hVolumes, betas, betas2, kValues, \
-		k2Values, fieldAmp, numTimeSteps
+		k2Values, fieldAmp, numTimeSteps, diameter
 
 
 def generate_fluctuations(numParticles, alpha, Ms, gamma, viscosity, temperature, volumes, hVolumes, dt, type):
