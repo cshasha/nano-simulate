@@ -69,7 +69,7 @@ def simulate_MH(numParticles=100, numReps=1, diameter=25, shape="cubic", savefil
 	"""
 	#set initial values
 	gamma, boxLength, rAvg, angFreq, dt, timeSteps, volumes, hVolumes, betas, betas2, kValues, k2Values, \
-		fieldAmp, numTimeSteps = calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, fieldAmp, \
+		fieldAmp, numTimeSteps, diameter = calculate_values(shape, kBulk, kSurface, K, K2, kSigma, Ms, fieldFreq, fieldAmp, \
 		concentration, numTimeSteps, numParticles, diameter, sigma, hDiameter, hSigma, coating, cycles)
 	
 	#initialize empty matrix to be saved
@@ -349,9 +349,11 @@ def run_simulation(numTimeSteps, numParticles, particleMoments, particleAxes, di
 	return particleMoments
 
 
-magData = simulate_MH(numParticles=100, numReps=1, numTimeSteps=1000, shape = "uniaxial",K = 6000,brownian="on",interactions="off", cut=10)
-#pl.plot(magData[:,0], magData[:,1])
-#pl.show()
+magData = simulate_MH(numParticles=10, numReps=1, numTimeSteps=1000, concentration=1e10,interactions="on",brownian="off",shape = "uniaxial", K=6000, cut=10)
+pl.plot(magData[:,0], magData[:,1])
+pl.show()
+
+
 
 
 
